@@ -1,0 +1,113 @@
+#   DOCS
+HepaTwin Draft Proposal GEMASTIK XIX 2026 Rev 2.md
+
+# ==========================================
+# 1. ENVIRONMENT VARIABLES & SECRETS (KRITIKAL!)
+# ==========================================
+.env
+.env.local
+.env.*.local
+.env.backup
+*.pem
+*.key
+*.cert
+auth.json
+
+# ==========================================
+# 2. BACKEND DEPENDENCIES
+# ==========================================
+# Node.js Backend
+node_modules/
+
+# PHP / Composer (Laravel, Symfony, dll)
+/vendor/
+
+# Python / Go (Virtual environments & binaries)
+venv/
+.env/
+/bin
+*.exe
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==========================================
+# 3. STORAGE, DATABASE & SESSIONS
+# ==========================================
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+*.sql.gz
+
+# Uploaded user files / Local asset storage
+/public/uploads/
+/public/storage
+/storage/app/public/*
+!/storage/app/public/.gitignore
+
+# ==========================================
+# 4. BACKEND CACHE & LOGS (Contoh: Laravel / Node)
+# ==========================================
+# PHP/Laravel Cache & Logs
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/storage/*.key
+/storage/debugbar/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+!/storage/logs/.gitignore
+
+# General Logs & Process
+*.log
+logs/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================================
+# 5. PACKAGE MANAGER LOGS
+# ==========================================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==========================================
+# 6. IDE / EDITOR FILES
+# ==========================================
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains (WebStorm, PhpStorm, IntelliJ, GoLand)
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ==========================================
+# 7. OPERATING SYSTEM FILES
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+opencode.json
