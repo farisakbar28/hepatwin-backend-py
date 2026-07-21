@@ -4,12 +4,11 @@ from typing import List, Union
 import json
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "HepaTwin SPRINT 0 Backend"
+    PROJECT_NAME: str = "HepaTwin Backend API"
     API_V1_STR: str = "/api/v1"
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:3000"]
     AI_MODEL_PATH: str = "models/model.pt"
     DEBUG: bool = False
-
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
@@ -24,6 +23,6 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

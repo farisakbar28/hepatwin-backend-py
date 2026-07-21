@@ -21,7 +21,7 @@ def get_canonical_smiles(smiles: str) -> str:
 def deduplicate_datasets(dilirank_path: str, xu_path: str, output_path: str):
     """
     Melakukan deduplikasi dataset eksternal (Xu et al.) terhadap dataset latih (DILIrank)
-    seperti diisyaratkan pada proposal bab E.8 untuk mencegah data leakage semu.
+    untuk mencegah data leakage semu.
     """
     logging.info(f"Membaca dataset DILIrank dari {dilirank_path}...")
     try:

@@ -9,7 +9,7 @@ import shap
 
 logger = logging.getLogger(__name__)
 
-# Daftar SMARTS patterns untuk fitur RDKit (E.6 & E.7)
+# Daftar SMARTS patterns untuk fitur RDKit
 SMARTS_PATTERNS = {
     "Phenol group": "c1ccccc1O",
     "Acetamide / Amide group": "C(=O)N",
@@ -24,7 +24,7 @@ SMARTS_PATTERNS = {
 
 class HybridGNN(nn.Module):
     """
-    Arsitektur Hybrid GNN + Features (E.7).
+    Arsitektur Hybrid GNN + Features.
     """
     def __init__(self, node_features=9, hidden_channels=64, num_struct_features=9, num_classes=1):
         super(HybridGNN, self).__init__()
@@ -134,7 +134,7 @@ class HybridAIEngine:
             return False
 
     def get_explainability(self, smiles: str) -> List[str]:
-        # Implementasi SHAP attribution (E.6)
+        # Implementasi SHAP attribution
         try:
             from rdkit import Chem
             mol = Chem.MolFromSmiles(smiles)
@@ -150,7 +150,7 @@ class HybridAIEngine:
             batch = torch.zeros(data.x.size(0), dtype=torch.long).to(self.device)
 
             # SHAP explainer untuk layer struktural (memerlukan wrapper function)
-            # Karena GNN kompleks di SHAP, kita targetkan substruktur RDKit (E.6)
+            # Karena GNN kompleks di SHAP, kita targetkan substruktur RDKit
             
             def model_predict(struct_input):
                 # struct_input is shape (n_samples, n_features)

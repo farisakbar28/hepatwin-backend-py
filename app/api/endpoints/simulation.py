@@ -1,11 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.models.schemas import SimulationRequest, SimulationResponse
+from app.api.dependencies import get_orchestrator
+from app.services.simulation_orchestrator import SimulationOrchestrator
 
 router = APIRouter()
 
-# Import the orchestrator instance from health so we don't instantiate it twice
-from app.api.endpoints.health import orchestrator
-
 @router.post("/simulate", response_model=SimulationResponse)
-def simulate_dili(request: SimulationRequest):
+def simulate_dili(request: SimulationRequest, orchestrator: SimulationOrchestrator = Depends(get_orchestrator)):
     return orchestrator.handle_request(request)

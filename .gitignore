@@ -30,6 +30,7 @@ venv/
 __pycache__/
 *.py[cod]
 *$py.class
+HepaTwin_PRD.md
 
 # ==========================================
 # 3. STORAGE, DATABASE & SESSIONS

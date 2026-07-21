@@ -1,5 +1,5 @@
 # HepaTwin Backend API
-FastAPI backend untuk HepaTwin: Digital Twin Hati Berbasis Kecerdasan Buatan untuk Simulasi Visual 3D Hepatotoksisitas Obat dan Triase Praklinis In-Silico Berbiaya Rendah. Dikembangkan untuk GEMASTIK XIX 2026.
+FastAPI backend untuk HepaTwin: Digital Twin Hati Berbasis Kecerdasan Buatan untuk Simulasi Visual 3D Hepatotoksisitas Obat dan Triase Praklinis In-Silico Berbiaya Rendah.
 
 ## Tentang Repositori Ini
 Backend ini menyediakan API komputasi untuk mendukung dua *mode* utama:
@@ -16,7 +16,7 @@ Backend ini menyediakan API komputasi untuk mendukung dua *mode* utama:
   * RDKit (Cheminformatics, SMILES processing, SMARTS substructures)
   * Scikit-Learn
   * SHAP (Model Explainability)
-* **Scientific Computing**: NumPy
+* **Scientific Computing**: NumPy, SciPy
 
 ## Instalasi
 1. Pastikan Python 3.x sudah terpasang di sistem.
@@ -32,6 +32,7 @@ Backend ini menyediakan API komputasi untuk mendukung dua *mode* utama:
    ```bash
    pip install -r requirements.txt
    ```
+4. Salin `.env.example` ke `.env` dan sesuaikan nilainya.
 
 ## Menjalankan Server
 Jalankan server menggunakan uvicorn:
@@ -41,6 +42,9 @@ uvicorn app.main:app --reload
 API akan berjalan di `http://127.0.0.1:8000`. Dokumentasi interaktif (Swagger UI) dapat diakses di `http://127.0.0.1:8000/docs`.
 
 ## Endpoint Utama
+### `GET /health`
+Endpoint health check yang memverifikasi ketersediaan dan status AI Engine serta PK/PD Engine.
+
 ### `POST /api/v1/simulate`
 Menerima payload JSON untuk memicu simulasi. 
 
@@ -62,16 +66,17 @@ Menerima payload JSON untuk memicu simulasi.
 ```
 
 **Struktur Response:**
-Mengembalikan objek `SimulationResponse` yang memuat `DILI_score`, daftar `explainability` (gugus fungsi kontributor), `visual_pattern` untuk rendering frontend, serta `time_series_pkpd` (khusus mode edukasi berbasis waktu).
+Mengembalikan objek `SimulationResponse` yang memuat `DILI_score`, `risk_level`, `damage_severity`, daftar `explainability` (gugus fungsi kontributor), `visual_pattern` untuk rendering frontend, `supports_micro_zoom`, `disclaimer_hideable`, serta `time_series_pkpd` dan `nomogram_data` (khusus mode edukasi berbasis waktu untuk Paracetamol).
 
 ## Struktur Direktori
-```
+```text
 app/
-├── api/             # Router & Endpoints FastAPI
+├── api/             # Router & Endpoints FastAPI, beserta Dependency Injection
 ├── core/            # Konfigurasi aplikasi (CORS, dsb)
 ├── models/          # Skema data (Pydantic models)
 ├── services/        # Logika bisnis inti (Engine AI & PK/PD)
 └── main.py          # Entry point aplikasi
+data_preparation/    # Script bantu pemrosesan data (deduplikasi dataset)
 ```
 
 ## Lisensi & Keterbatasan

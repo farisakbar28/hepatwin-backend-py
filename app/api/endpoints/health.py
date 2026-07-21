@@ -1,12 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.api.dependencies import get_orchestrator
 from app.services.simulation_orchestrator import SimulationOrchestrator
 
 router = APIRouter()
-# Use orchestrator to get the state of engines
-orchestrator = SimulationOrchestrator()
 
 @router.get("/health")
-def health_check() -> dict:
+def health_check(orchestrator: SimulationOrchestrator = Depends(get_orchestrator)) -> dict:
     ai_ready = getattr(orchestrator.ai_engine, 'ready', False)
     # The pkpd_engine is deterministic and doesn't load files, so it is always ready after init
     pkpd_ready = True

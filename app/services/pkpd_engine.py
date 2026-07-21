@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class AcetaminophenPKPDEngine:
     """
     Model Matematika PK/PD Paracetamol.
-    Referensi: Bab E.4.0 Proposal (Morse et al., 2022).
+    Referensi: Morse et al., 2022.
     """
     F_ORAL = 0.86
     CL_SYSTEMIC = 24.0 # L/hr
@@ -99,5 +99,15 @@ class AcetaminophenPKPDEngine:
         data = []
         for t in [4, 8, 12, 16, 20, 24]:
             c_plasma = self.calculate_oral_absorption(dose_mg_kg, t)
-            data.append({"time": t, "plasma_concentration": round(c_plasma, 2)})
+            # Placeholder values for Rumack-Matthew lines to establish the data structure for Sprint 0.
+            # Actual values will be calculated in Sprint 2 based on validated pharmacology data.
+            rumack_line_200 = 200.0 * math.exp(-0.1 * t)
+            rumack_line_150 = rumack_line_200 * 0.75
+            
+            data.append({
+                "time": t, 
+                "plasma_concentration": round(c_plasma, 2),
+                "rumack_line_150": round(rumack_line_150, 2),
+                "rumack_line_200": round(rumack_line_200, 2)
+            })
         return data
