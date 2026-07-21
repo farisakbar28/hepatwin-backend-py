@@ -111,3 +111,10 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 opencode.json
+# ==========================================
+# 8. AI MODELS & WEIGHTS
+# ==========================================
+models/
+*.pt
+*.pth
+*.h5
