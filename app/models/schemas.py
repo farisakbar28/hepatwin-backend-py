@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, Literal
 
+# Keputusan TA.4 (docs/AUDIT_TASKS.md, Ketua Tim, 2026-07-22):
+# - Nama field `compound_id`/`smiles_string` DIPERTAHANKAN sebagai-adanya,
+#   TIDAK diganti ke `compound`/`smiles` (nama di EXECUTION_PLAN.md/Arsitektur).
+# - Field `model_status` ([EKSTENSI], ditambahkan TA.3) DIADOPSI permanen.
 class SimulationRequest(BaseModel):
     mode: Literal["edukasi_mendalam", "triase_umum"] = Field(
         ..., 
@@ -41,5 +45,15 @@ class SimulationResponse(BaseModel):
     supports_micro_zoom: bool = Field(..., description="Menandakan apakah senyawa mendukung zoom mikroskopis.")
     explainability: List[str] = Field(..., description="Daftar gugus fungsi kimia/farmakologis.")
     visual_pattern: str = Field(..., description="Pola visual 3D.")
+    model_status: Literal["trained", "untrained_random_weights", "mock"] = Field(
+        ...,
+        description=(
+            "[EKSTENSI] Status bobot model AI: 'trained' bila artefak model berhasil "
+            "dimuat, 'untrained_random_weights' bila skor berasal dari bobot inisialisasi "
+            "acak (belum ada model.pt terlatih), 'mock' bila server berjalan dengan "
+            "MOCK_MODE=True (audit TA.8 — respons dummy, bukan hasil komputasi apa pun). "
+            "Lihat AGENTS.md §3.10, temuan audit F1."
+        ),
+    )
     time_series_pkpd: Optional[List[Dict[str, Any]]] = Field(None, description="Data plot grafik NAPQI/GSH.")
     nomogram_data: Optional[List[Dict[str, Any]]] = Field(None, description="Data plot klinis Rumack-Matthew.")

@@ -66,7 +66,9 @@ Menerima payload JSON untuk memicu simulasi.
 ```
 
 **Struktur Response:**
-Mengembalikan objek `SimulationResponse` yang memuat `DILI_score`, `risk_level`, `damage_severity`, daftar `explainability` (gugus fungsi kontributor), `visual_pattern` untuk rendering frontend, `supports_micro_zoom`, `disclaimer_hideable`, serta `time_series_pkpd` dan `nomogram_data` (khusus mode edukasi berbasis waktu untuk Paracetamol).
+Mengembalikan objek `SimulationResponse` yang memuat `DILI_score`, `risk_level`, `damage_severity`, daftar `explainability` (gugus fungsi kontributor, hanya nama yang sudah divalidasi Farmasi — kosong bila belum ada), `visual_pattern` untuk rendering frontend, `supports_micro_zoom`, `disclaimer_hideable`, `model_status` (`"trained"` atau `"untrained_random_weights"` — lihat catatan di bawah), serta `time_series_pkpd` dan `nomogram_data` (khusus mode edukasi berbasis waktu untuk Paracetamol; saat ini terblokir sampai konstanta PD tervalidasi Farmasi, lihat PRD §13 item #1).
+
+> **Catatan status model:** `models/model.pt` belum ada di repo ini, sehingga `HybridAIEngine` berjalan dengan bobot inisialisasi acak. Field `model_status="untrained_random_weights"` menandai ini secara eksplisit di setiap response — skor `DILI_score` pada kondisi ini TIDAK mencerminkan model terlatih apa pun (lihat `docs/AUDIT_TASKS.md` temuan F1).
 
 ## Struktur Direktori
 ```text

@@ -123,7 +123,10 @@ opencode.json
 # ==========================================
 # 8. AI MODELS & WEIGHTS
 # ==========================================
-models/
+# Root-anchored: HANYA folder bobot ML di root, JANGAN meng-ignore app/models/
+# (folder skema Pydantic — kode inti). Pola `models/` tanpa slash awal tadinya
+# ikut menangkap app/models/.
+/models/
 *.pt
 *.pth
 *.h5
