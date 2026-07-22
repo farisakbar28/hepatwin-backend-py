@@ -29,11 +29,43 @@ lisensi (dicatat di `NOTICE.md`), bukan validasi angka.
 |---|---|---|---|
 | DILIrank **v2.0** (training) | FDA LTKB, Olubamiwa et al., *Drug Discovery Today* 2025;30(11):104485 | ✅ ditempatkan 2026-07-22 | `ml/data/raw/dilirank.csv` (1.336 baris: nama + label) |
 | Xu et al. 2015 (external test) | Xu, Y. et al. "Deep learning for drug-induced liver injury." *J. Chem. Inf. Model.* 55(10):2085-2093 (2015) — ditarik via TDC (`tdc.single_pred.Tox(name='DILI')`), diekspor jadi CSV polos | ✅ ditempatkan 2026-07-22 | `ml/data/raw/xu2015.csv` (475 baris: smiles + label) |
-| SMILES hasil resolusi nama (DILIrank) | PubChem PUG-REST (layanan publik) | 🔄 sedang dijalankan | `ml/data/interim/dilirank_smiles.csv` |
+| SMILES hasil resolusi nama (DILIrank) | PubChem PUG-REST (layanan publik) | ✅ selesai 2026-07-23 | `ml/data/interim/dilirank_smiles.csv` (1.225/1.336 resolve, 91,7%) |
 
 > Deduplikasi WAJIB pakai blok-1 InChIKey (bukan SMILES string). Skrip lama
 > `data_preparation/deduplicate_smiles.py` memakai metode yang SALAH (canonical
 > SMILES + stereo) dan **dibongkar-ganti** di `ml/scripts/04_dedup_split.py`.
+
+### 1.2 Hasil pipeline pertama dengan data asli (2026-07-23)
+
+Dijalankan penuh: `01` (data ditempatkan manual) → `02_resolve_smiles` →
+`03_standardize` (kedua dataset) → `04_dedup_split`. Laporan lengkap di
+`ml/reports/{02_resolve,03_standardize_dilirank,03_standardize_xu2015,04_dedup_split}.md`.
+
+| Tahap | DILIrank | Xu et al. 2015 |
+|---|---|---|
+| Baris mentah | 1.336 (nama) | 475 (SMILES) |
+| Setelah resolusi nama | 1.225 (91,7%) | — (sudah SMILES) |
+| Setelah standardisasi + kelayakan | 861 | 470 |
+| Setelah dedup internal (DILIrank) | 838 (1 block1 konflik label dibuang, 21 duplikat digabung) | — |
+| **Final**: train / valid / external_test | 708 / 130 | **166** (304 dibuang karena overlap dg DILIrank) |
+
+**Verifikasi yang dilakukan (bukan asumsi):**
+- Assert nol overlap InChIKey blok-1 train↔external_test: **lulus**.
+- Total compound unik di ketiga file (1.004) == jumlah baris ketiga file (1.004) → tidak ada kebocoran di manapun, sudah dicek manual bukan hanya lewat assert di skrip.
+- Ditelusuri manual 1 kasus overlap sisa di external_test: amfetamin (`CC(N)Cc1ccccc1`), muncul 2x di DILIrank dengan label bertentangan (1 dan 0) → dibuang total dari training oleh gerbang konflik-label, sehingga sah tetap di external_test (tidak ada risiko kebocoran karena training tidak pernah melihatnya).
+- Distribusi label sehat di ketiga split (tidak ada kelas kosong/timpang ekstrem): train 443/265, valid 77/53, external_test 77/89.
+- Overlap DILIrank↔Xu yang tinggi (304/470 = 65%) kemungkinan sebagian adalah efek keputusan §1.1 (v2.0 punya 300 obat lebih banyak dari v1 → makin besar peluang tumpang tindih dg Xu et al.).
+
+**Bug ditemukan & diperbaiki saat menjalankan `02_resolve_smiles.py` pada data asli:**
+`resolve_name()` menolak SEMUA respons PubChem multi-baris, termasuk yang isinya
+identik (PubChem kadang mengembalikan SMILES yang sama berkali-kali untuk satu
+nama karena banyak sinonim/CID mengarah ke struktur yang sama — mis. Nystatin
+mengembalikan 25 baris identik). Ini menyebabkan senyawa kecil terkenal
+(Nystatin, Scopolamine, Granisetron) salah tercatat "gagal resolve" padahal
+datanya valid. Diperbaiki: bandingkan SMILES via RDKit (bukan string mentah)
+sebelum menerima/menolak sebagai ambigu. Diverifikasi lewat re-query manual ke
+PubChem sebelum dan sesudah fix. Cache lama dihapus total, resolusi diulang
+dari nol supaya tidak ada entri `null` basi yang tersisa.
 
 ### 1.1 Keputusan: DILIrank v2.0 (bukan v1) — `[DEVIASI]` diselesaikan 2026-07-22
 
