@@ -7,31 +7,15 @@ from torch_geometric.data import Data
 import numpy as np
 import shap
 
+# Sumber tunggal kamus SMARTS + gerbang validasi (app/chem, Fase 1). ai_engine
+# tidak lagi mendefinisikan SMARTS-nya sendiri (AGENTS.md §4: satu sumber).
+from app.chem.smarts_library import (
+    SMARTS_COMPILED,
+    SMARTS_LIBRARY,
+    validated_library,
+)
+
 logger = logging.getLogger(__name__)
-
-# Kamus SMARTS untuk fitur RDKit. Pola-pola ini boleh dipakai sebagai fitur
-# model kapan saja, tapi namanya HANYA boleh muncul di output explainability
-# bila lolos `validated_library()` (PRD §8.5, §13 item #2; AGENTS.md §3.7).
-SMARTS_LIBRARY = {
-    "Phenol group": "c1ccccc1O",
-    "Acetamide / Amide group": "C(=O)N",
-    "Carboxylic acid group": "C(=O)O",
-    "Sulfonamide group": "S(=O)(=O)N",
-    "Beta-lactam ring": "C1C(=O)NC1",
-    "Primary amine": "[NX3;H2,H3]",
-    "Nitro group": "N(=O)=O",
-    "Thiazole ring": "c1scnc1",
-    "Piperazine": "C1CNCCN1"
-}
-
-# Diisi manusia setelah ACC tertulis dari anggota Farmasi. JANGAN diisi oleh agent.
-SMARTS_VALIDATED_BY_PHARMACY: set = set()
-
-
-def validated_library() -> dict:
-    """Hanya gugus yang sudah diberi ACC tertulis Farmasi boleh tampil dengan
-    nama farmakologis di response API (PRD §8.5, §13 item #2)."""
-    return {k: v for k, v in SMARTS_LIBRARY.items() if k in SMARTS_VALIDATED_BY_PHARMACY}
 
 class HybridGNN(nn.Module):
     """
@@ -97,10 +81,9 @@ def smiles_to_graph_and_features(smiles: str) -> tuple:
     else:
         edge_index = torch.empty((2, 0), dtype=torch.long)
         
-    # Ekstraksi Structural Features via SMARTS
+    # Ekstraksi Structural Features via SMARTS (pola precompiled, sumber tunggal)
     struct_features = []
-    for name, smarts in SMARTS_LIBRARY.items():
-        pat = Chem.MolFromSmarts(smarts)
+    for pat in SMARTS_COMPILED.values():
         has_match = 1.0 if mol.HasSubstructMatch(pat) else 0.0
         struct_features.append(has_match)
         
