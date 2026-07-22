@@ -1,3 +1,8 @@
+# INFERENCE-ONLY (masuk Docker image). AGENTS.md §3.9: jangan tambah pustaka
+# training/plotting/notebook ke sini — ukuran image berdampak ke NFR PRD §6.
+# Catatan: torch + torch-geometric adalah dependensi inference HANYA bila
+# ML_BACKEND=gnn. Bila gerbang T1.11 memilih 'tabular', keduanya dipindah ke
+# requirements-dev.txt dan diganti lightgbm di sini (lihat Arsitektur §D.5, §F.1).
 fastapi>=0.111.0
 uvicorn>=0.30.1
 pydantic>=2.7.4

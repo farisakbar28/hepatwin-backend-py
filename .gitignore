@@ -24,6 +24,7 @@ node_modules/
 
 # Python / Go (Virtual environments & binaries)
 venv/
+.venv/
 .env/
 /bin
 *.exe
@@ -31,6 +32,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 HepaTwin_PRD.md
+
+# ==========================================
+# ML PIPELINE (data mentah/olahan & artefak model — TIDAK masuk git)
+# ==========================================
+ml/data/
+*.joblib
+*.npz
 
 # ==========================================
 # 3. STORAGE, DATABASE & SESSIONS

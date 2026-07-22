@@ -1,0 +1,19 @@
+# DEV / TRAINING ONLY — TIDAK masuk Docker image (AGENTS.md §3.9, §7.6).
+# Berisi semua dependensi inference + pustaka khusus pipeline data, training,
+# plotting, dan tooling. Install: pip install -r requirements-dev.txt
+-r requirements.txt
+
+# --- Data pipeline (ml/scripts 01-04) ---
+pandas>=2.2.2
+requests>=2.32.3          # PubChem PUG-REST untuk resolusi nama -> SMILES (T1.2)
+openpyxl>=3.1.5           # baca DILIrank .xlsx (T1.1)
+
+# --- Training & evaluasi (ml/scripts 05-07) ---
+lightgbm>=4.4.0           # baseline tabular (T1.9) & fallback resmi (PRD §13 #4)
+scikit-learn>=1.5.1       # metrik, kalibrasi, split
+matplotlib>=3.9.1         # kurva ROC/PR, plot validasi nomogram
+
+# --- Tooling (AGENTS.md §5) ---
+pytest>=8.2.2
+ruff>=0.5.5
+mypy>=1.11.0

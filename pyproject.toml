@@ -1,0 +1,19 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "slow: test yang membaca file besar / lambat (lewati dengan -m 'not slow')",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# Konservatif dulu: error dasar + pyflakes + import. Diperketat menyusul.
+select = ["E", "F", "I"]
+ignore = ["E501"]  # panjang baris ditangani formatter, jangan blokir
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true  # rdkit/torch_geometric/shap belum punya stub lengkap
