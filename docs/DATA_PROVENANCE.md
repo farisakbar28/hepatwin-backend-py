@@ -27,13 +27,50 @@ lisensi (dicatat di `NOTICE.md`), bukan validasi angka.
 
 | Data | Sumber | Status | Dipakai di |
 |---|---|---|---|
-| DILIrank (training) | FDA LTKB (Chen et al., 2016, PRD §15) | ⬜ belum diunduh | `ml/data/raw/dilirank.xlsx` |
-| Xu et al. 2015 (external test) | kurasi Peking University (PRD §15) | ⬜ belum diunduh | `ml/data/raw/xu2015.csv` |
-| SMILES hasil resolusi nama | PubChem PUG-REST (layanan publik) | ⬜ belum dijalankan | `ml/data/interim/` |
+| DILIrank **v2.0** (training) | FDA LTKB, Olubamiwa et al., *Drug Discovery Today* 2025;30(11):104485 | ✅ ditempatkan 2026-07-22 | `ml/data/raw/dilirank.csv` (1.336 baris: nama + label) |
+| Xu et al. 2015 (external test) | Xu, Y. et al. "Deep learning for drug-induced liver injury." *J. Chem. Inf. Model.* 55(10):2085-2093 (2015) — ditarik via TDC (`tdc.single_pred.Tox(name='DILI')`), diekspor jadi CSV polos | ✅ ditempatkan 2026-07-22 | `ml/data/raw/xu2015.csv` (475 baris: smiles + label) |
+| SMILES hasil resolusi nama (DILIrank) | PubChem PUG-REST (layanan publik) | 🔄 sedang dijalankan | `ml/data/interim/dilirank_smiles.csv` |
 
 > Deduplikasi WAJIB pakai blok-1 InChIKey (bukan SMILES string). Skrip lama
 > `data_preparation/deduplicate_smiles.py` memakai metode yang SALAH (canonical
-> SMILES + stereo) dan akan **dibongkar-ganti** di `ml/scripts/04_dedup_split.py`.
+> SMILES + stereo) dan **dibongkar-ganti** di `ml/scripts/04_dedup_split.py`.
+
+### 1.1 Keputusan: DILIrank v2.0 (bukan v1) — `[DEVIASI]` diselesaikan 2026-07-22
+
+PRD §7/§8.4/§15 menyebut DILIrank v1 (Chen et al. 2016, 1.036 obat). File yang
+tersedia untuk tim adalah **v2.0** (1.336 obat: +300 obat baru 2010–2021, 49
+direklasifikasi ulang; Olubamiwa et al. 2025). Ini persis item keputusan
+tertunda #4 di dokumen Arsitektur Bagian I.
+
+**Keputusan:** adopsi v2.0. **Alasan:** data lebih banyak & lebih mutakhir;
+tim tidak memiliki akses mudah ke arsip v1 yang sudah digantikan FDA.
+
+**Tindak lanjut yang BELUM dikerjakan** (bukan keputusan agent, perlu sesi
+dokumentasi terpisah): PRD §7, §8.4, §15 idealnya disinkronkan menyebut v2.0 +
+sitasi Olubamiwa et al. 2025, dan reklasifikasi 49 obat bisa dipakai sebagai
+bahan diskusi "ketidakstabilan label DILI" di laporan akhir (per catatan
+Arsitektur Bagian I #4).
+
+### 1.2 Catatan: Xu et al. 2015 & keterkaitan historis NCTR
+
+Deskripsi resmi TDC menyebut dataset Xu et al. 2015 "aggregated from U.S. FDA's
+National Center for Toxicological Research". **Ini BUKAN pelanggaran AGENTS.md
+§3.8** — larangan itu soal memakai NCTR **mentah** sebagai dataset (sirkular
+dengan DILIrank yang historisnya juga dari NCTR). Xu et al. 2015 adalah dataset
+tersendiri, dikurasi grup riset berbeda (bukan FDA), persis yang PRD §8.4
+sanksi sebagai external test. Justru keterkaitan historis inilah alasan PRD
+mewajibkan dedup InChIKey blok-1 (`04_dedup_split.py`) — sudah diantisipasi
+dokumen Arsitektur §D.7 ("DILIrank dan Xu et al. sama-sama bersumber dari pool
+obat yang beririsan").
+
+TDC juga merekomendasikan **scaffold split + AUROC** untuk dataset ini — cocok
+dengan desain `04_dedup_split.py` yang sudah dibangun independen dari TDC.
+
+**Soal PyTDC:** dipakai SEKALI (versi ringan 0.4.1, terverifikasi tanpa
+tiledbsoma/cellxgene-census yang membuat versi terbaru gagal build di Windows)
+untuk menarik data lalu diekspor ke CSV polos. TIDAK menjadi dependensi
+permanen — tidak masuk `requirements-dev.txt`, pipeline kita berjalan di atas
+RDKit+pandas murni.
 
 ---
 
