@@ -58,12 +58,49 @@ def _get(url: str) -> str | None:
 
 
 def resolve_name(name: str) -> str | None:
-    """Nama → canonical SMILES via PubChem. None bila gagal."""
+    """Nama → canonical SMILES via PubChem. None bila gagal ATAU ambigu.
+
+    PubChem endpoint TXT kadang mengembalikan >1 baris karena satu nama cocok
+    ke beberapa CID/sinonim (mis. beberapa entri database untuk senyawa yang
+    sama). BUG LAMA di sini menolak SEMUA respons multi-baris walau isinya
+    identik — menyebabkan senyawa umum seperti Nystatin/Scopolamine/Granisetron
+    salah tercatat "gagal resolve" padahal datanya ada dan benar.
+
+    Perbaikan: parse tiap baris via RDKit dan bandingkan SMILES kanonik
+    (bukan string mentah — PubChem bisa menulis representasi berbeda untuk
+    molekul identik). Bila semua baris = molekul yang sama, ambil salah satu.
+    Bila benar-benar berbeda struktur (ambigu asli) → None, JANGAN menebak
+    (T1.2: jangan menebak struktur untuk nama yang tidak pasti).
+    """
     encoded = quote(name)
     url = f"{PUBCHEM}/compound/name/{encoded}/property/CanonicalSMILES/TXT"
     result = _get(url)
-    if result and "\n" not in result and result:
-        return result.splitlines()[0].strip()
+    if not result:
+        return None
+
+    lines = [ln.strip() for ln in result.splitlines() if ln.strip()]
+    if not lines:
+        return None
+    if len(lines) == 1:
+        return lines[0]
+
+    # >1 baris: verifikasi semua merepresentasikan molekul yang sama
+    from rdkit import Chem
+
+    canonical_forms = set()
+    for line in lines:
+        mol = Chem.MolFromSmiles(line)
+        if mol is None:
+            logger.warning("Baris tak terparse RDKit untuk %r: %r", name, line)
+            return None
+        canonical_forms.add(Chem.MolToSmiles(mol))
+
+    if len(canonical_forms) == 1:
+        return lines[0]
+
+    logger.warning(
+        "Nama %r ambigu: %d struktur BERBEDA ditemukan, tidak ditebak", name, len(canonical_forms)
+    )
     return None
 
 
