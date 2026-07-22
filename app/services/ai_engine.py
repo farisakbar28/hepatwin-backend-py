@@ -9,8 +9,10 @@ import shap
 
 logger = logging.getLogger(__name__)
 
-# Daftar SMARTS patterns untuk fitur RDKit
-SMARTS_PATTERNS = {
+# Kamus SMARTS untuk fitur RDKit. Pola-pola ini boleh dipakai sebagai fitur
+# model kapan saja, tapi namanya HANYA boleh muncul di output explainability
+# bila lolos `validated_library()` (PRD §8.5, §13 item #2; AGENTS.md §3.7).
+SMARTS_LIBRARY = {
     "Phenol group": "c1ccccc1O",
     "Acetamide / Amide group": "C(=O)N",
     "Carboxylic acid group": "C(=O)O",
@@ -21,6 +23,15 @@ SMARTS_PATTERNS = {
     "Thiazole ring": "c1scnc1",
     "Piperazine": "C1CNCCN1"
 }
+
+# Diisi manusia setelah ACC tertulis dari anggota Farmasi. JANGAN diisi oleh agent.
+SMARTS_VALIDATED_BY_PHARMACY: set = set()
+
+
+def validated_library() -> dict:
+    """Hanya gugus yang sudah diberi ACC tertulis Farmasi boleh tampil dengan
+    nama farmakologis di response API (PRD §8.5, §13 item #2)."""
+    return {k: v for k, v in SMARTS_LIBRARY.items() if k in SMARTS_VALIDATED_BY_PHARMACY}
 
 class HybridGNN(nn.Module):
     """
@@ -88,7 +99,7 @@ def smiles_to_graph_and_features(smiles: str) -> tuple:
         
     # Ekstraksi Structural Features via SMARTS
     struct_features = []
-    for name, smarts in SMARTS_PATTERNS.items():
+    for name, smarts in SMARTS_LIBRARY.items():
         pat = Chem.MolFromSmarts(smarts)
         has_match = 1.0 if mol.HasSubstructMatch(pat) else 0.0
         struct_features.append(has_match)
@@ -106,18 +117,30 @@ class HybridAIEngine:
         self.model_path = model_path
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        num_struct_features = len(SMARTS_PATTERNS)
+        num_struct_features = len(SMARTS_LIBRARY)
         self.model = HybridGNN(num_struct_features=num_struct_features).to(self.device)
+        self.weights_loaded = False
         if self.model_path:
             try:
                 self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
+                self.weights_loaded = True
                 logger.info(f"Loaded weights from {self.model_path}")
             except Exception as e:
                 logger.warning(f"Could not load weights from {self.model_path}: {e}. Using random weights.")
         self.model.eval() # Set to evaluation mode
-        
-        logger.info(f"HybridAIEngine initialized on {self.device}. Path: {model_path}")
+
+        logger.info(
+            f"HybridAIEngine initialized on {self.device}. Path: {model_path}. "
+            f"Weights loaded: {self.weights_loaded}"
+        )
         self.ready = True
+
+    @property
+    def model_status(self) -> str:
+        """'trained' hanya bila bobot artefak berhasil dimuat dari model_path;
+        selain itu 'untrained_random_weights' (temuan audit F1, AGENTS.md §3.10).
+        Dilarang mengembalikan skor dari model tak terlatih tanpa penanda ini."""
+        return "trained" if self.weights_loaded else "untrained_random_weights"
 
     def validate_smiles(self, smiles: str) -> bool:
         """
@@ -167,33 +190,38 @@ class HybridAIEngine:
                 return np.array(out_scores)
 
             # Baseline kosong (semua substruktur = 0)
-            background = np.zeros((1, len(SMARTS_PATTERNS)))
+            background = np.zeros((1, len(SMARTS_LIBRARY)))
             explainer = shap.KernelExplainer(model_predict, background)
-            
+
             # Hitung SHAP value untuk fitur molekul saat ini
             shap_values = explainer.shap_values(struct_tensor.cpu().numpy(), silent=True)
-            
+
             # Ekstrak fitur yang paling berkontribusi positif
-            contributing_features = []
-            feature_names = list(SMARTS_PATTERNS.keys())
-            
+            matched_features = []
+            feature_names = list(SMARTS_LIBRARY.keys())
+
             # shap_values[0] adalah prediksi untuk sample pertama
             # Nilai SHAP > 0 berarti meningkatkan risiko DILI
             sv = shap_values[0] if isinstance(shap_values, list) else shap_values[0]
-            
+
             for i, val in enumerate(sv):
                 if val > 0.001 and struct_tensor[0][i].item() == 1.0:
-                    contributing_features.append(feature_names[i])
-                    
-            if not contributing_features:
+                    matched_features.append(feature_names[i])
+
+            if not matched_features:
                 # Jika tidak ada atribusi kuat dari SHAP, fallback ke fitur struktural yang ada
                 for i, val in enumerate(struct_tensor[0]):
                     if val.item() == 1.0:
-                        contributing_features.append(feature_names[i])
-                
+                        matched_features.append(feature_names[i])
+
+            # Saring: hanya gugus yang lolos ACC tertulis Farmasi boleh
+            # tampil dengan nama farmakologis (PRD §8.5, AGENTS.md §3.7).
+            allowed = validated_library()
+            contributing_features = [f for f in matched_features if f in allowed]
+
             if not contributing_features:
-                contributing_features = ["General structural features"]
-                
+                contributing_features = ["Menunggu validasi Farmasi untuk gugus spesifik"]
+
             return contributing_features
             
         except Exception as e:
