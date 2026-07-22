@@ -7,12 +7,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import logging
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.api.endpoints import health
+from app.api.router import api_router
 from app.core.config import settings
 from app.core.errors import HepaTwinError
-from app.api.router import api_router
-from app.api.endpoints import health
 
 logger = logging.getLogger(__name__)
 

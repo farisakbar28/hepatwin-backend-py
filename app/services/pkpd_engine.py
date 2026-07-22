@@ -1,9 +1,10 @@
 import logging
 import math
 from dataclasses import dataclass
-from typing import List, Dict, Optional
-from scipy.integrate import odeint
+from typing import Dict, List, Optional
+
 import numpy as np
+from scipy.integrate import odeint
 
 logger = logging.getLogger(__name__)
 

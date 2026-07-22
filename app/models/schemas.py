@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field
+
 
 # Keputusan TA.4 (docs/AUDIT_TASKS.md, Ketua Tim, 2026-07-22):
 # - Nama field `compound_id`/`smiles_string` DIPERTAHANKAN sebagai-adanya,

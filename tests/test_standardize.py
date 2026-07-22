@@ -6,12 +6,12 @@ mungkin perlu penyesuaian kecil setelah verifikasi RDKit nyata.
 """
 import pytest
 
-from app.core.errors import InorganicError, MolTooLargeError, SmilesInvalidError
 from app.chem.standardize import (
     check_eligibility,
     standardize,
     standardize_or_raise,
 )
+from app.core.errors import InorganicError, MolTooLargeError, SmilesInvalidError
 
 
 def test_invalid_smiles_returns_none():

@@ -17,3 +17,10 @@ ignore = ["E501"]  # panjang baris ditangani formatter, jangan blokir
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true  # rdkit/torch_geometric/shap belum punya stub lengkap
+
+# rdkit-stubs memakai sintaks 3.11+; venv lokal 3.10 → mypy gagal mem-parse stub.
+# Lewati modul pihak ketiga ini (bukan kode kita). Idealnya jalankan mypy di 3.11.
+[[tool.mypy.overrides]]
+module = ["rdkit.*", "torch.*", "torch_geometric.*", "shap.*", "scipy.*", "sklearn.*", "lightgbm.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true

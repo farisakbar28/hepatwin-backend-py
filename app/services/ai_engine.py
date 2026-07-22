@@ -1,11 +1,12 @@
 import logging
-from typing import Optional, List
-import torch
-import torch.nn as nn
-from torch_geometric.nn import GCNConv, global_mean_pool
-from torch_geometric.data import Data
+from typing import List, Optional
+
 import numpy as np
 import shap
+import torch
+import torch.nn as nn
+from torch_geometric.data import Data
+from torch_geometric.nn import GCNConv, global_mean_pool
 
 # Sumber tunggal kamus SMARTS + gerbang validasi (app/chem, Fase 1). ai_engine
 # tidak lagi mendefinisikan SMARTS-nya sendiri (AGENTS.md §4: satu sumber).
