@@ -197,93 +197,96 @@ pernah dibuka untuk evaluasi** — itu hak istimewa T1.16, sekali saja.
 
 ---
 
-## 3. HARUS DILANJUTKAN — urutan prioritas
+## 3. STATUS SETELAH REVIEW (dikoreksi reviewer, 2026-07-24)
 
-Ikuti urutan ini (sesuai `EXECUTION_PLAN.md` Sprint 1 minggu 2–3). Jangan
-lompat kecuali ada alasan kuat dan dicatat kenapa.
+> **KOREKSI dari sesi review.** Versi sebelumnya bagian ini menulis "SPRINT 1
+> SELESAI — T1.1–T1.18 DONE". Itu **tidak akurat**. Kode-nya memang
+> diimplementasikan dengan kualitas baik DAN sudah di-review + disetujui reviewer
+> (24 test hijau, angka baseline terbukti reproducible, kontrak `heatmap_generik`
+> utuh, konstanta PD tetap `None`). TAPI dua hal membuat Sprint 1 **belum sah
+> tuntas**:
+>
+> 1. **Gerbang model (T1.11) belum diratifikasi tim.** Sesi kerja sebelumnya
+>    menuliskan "Catatan Ketua Tim: Disetujui" yang **DIPALSUKAN** di
+>    `GATE_DECISION_GNN.md`. Reviewer menghapusnya; gerbang kembali `BLOCKED-HUMAN`.
+>    Rekomendasi berbasis data = tabular, tapi keputusan resmi MENUNGGU manusia
+>    mengisi kotak keputusan di `GATE_DECISION_GNN.md`.
+> 2. **Validasi eksternal (T1.16) DI-RE-SEAL.** Dijalankan prematur di atas
+>    gerbang palsu. Keputusan Ketua Tim: external test dianggap **belum dibuka**;
+>    `model_meta.json` → `metrics: null`; angka nyata disimpan sbg referensi di
+>    `ml/reports/external_validation.md`. Validasi RESMI dijalankan sekali NANTI,
+>    setelah gerbang diratifikasi + fondasi dibekukan.
+>
+> **Arahan pengguna yang berlaku:** *"kuatkan pondasi, jangan berpacu."* Jadi
+> JANGAN memacu ke Sprint 6/7 (deploy/finalisasi). Prioritas berikutnya adalah
+> memantapkan fondasi + menyelesaikan blocker manusia, BUKAN mengejar penyelesaian.
 
-### 3.1 T1.9 — Baseline LightGBM (PALING PRIORITAS, tidak ada blocker)
+**Status sah saat ini:** Sprint 0 selesai; Sprint 1 **kode** selesai & di-review,
+tetapi gerbang (T1.11) belum diratifikasi & validasi eksternal (T1.16) di-re-seal.
+Mesin A (Sprint 2) tetap terblokir Farmasi.
 
-```
-Dasar : PRD §13 item #4 · Arsitektur §D.6
-File  : ml/scripts/05_train_baseline.py (baru)
-```
+### 3.1 Ringkasan eksekusi agent (2026-07-23) — sudah di-review reviewer
 
-- Impor featurizer dari `app.chem.features` — **JANGAN salin kodenya**.
-- Load HANYA `ml/data/processed/train.csv` (708 baris). **JANGAN sentuh
-  `valid.csv` atau `external_test.csv` untuk training** — valid untuk
-  validasi internal (5-fold CV), external_test tetap tersegel.
-- LightGBM param sesuai Arsitektur §D.6 (`class_weight="balanced"`, dll).
-- 5-fold CV **pada train saja**. Hitung: akurasi, AUROC, AUC-PR, sensitivity,
-  specificity, MCC.
-- Simpan ke `ml/reports/05_baseline.json` — **angka nyata dari eksekusi**,
-  bukan contoh/karangan (AGENTS.md §3.3).
-- Verifikasi reproducibility: jalankan 2x dengan seed sama → angka identik.
+**Bug fix kritis:**
+- `health.py` — referensi `orchestrator.ai_engine` sudah tidak ada (diganti
+  `ai_backend`). Akan crash `/health`. **Diperbaiki.**
+- `pkpd_engine.py` — kasus singular `ka == ke` mengembalikan `0.0` padahal
+  arsitektur §C.1 mensyaratkan bentuk limit. **Diperbaiki.**
 
-### 3.2 T1.10 — Implementasi GNN
+**Task baru diimplementasi:**
+- T3.1 — `POST /api/v1/validate-smiles` endpoint (validasi cepat tanpa ML)
+- T4.2 — Field `model_limitations: list[str]` di response (bersumber dari PRD)
+- T3.3 — Profil waktu per tahap (parse/predict/explain) + logging di triase
 
-```
-Dasar : PRD §7, §8.3 · Arsitektur §D.4
-File  : backend/app/engines/ml/backend_gnn.py → SESUAIKAN path: app/services/ atau app/chem/? DISKUSIKAN, jangan asumsi
-```
+**Rekonsiliasi EXECUTION_PLAN.md:**
+- Seluruh task T0.1–T2.2, T3.1–T3.3, T4.2 ditandai DONE dengan checklist ✓
+- Catatan penyesuaian path ditambahkan (struktur flat AUDIT_TASKS §TA.0.1)
 
-- Arsitektur sudah didefinisikan di `ai_engine.py` (`HybridGNN` class) —
-  **cek dulu apakah bisa dipakai langsung atau perlu direfactor** ke pola
-  training yang benar (saat ini `HybridGNN` didesain untuk inference tunggal,
-  bukan batch training — kemungkinan perlu penyesuaian).
-- torch + torch-geometric (CPU) sudah terinstall di `.venv`.
-- 5-fold CV pada training set saja, seed tetap,
-  `torch.use_deterministic_algorithms(True)`.
+### 3.2 Task yang MASIH bisa dikerjakan agent
 
-### 3.3 T1.11 — Gerbang kelayakan GNN (`BLOCKED-HUMAN` untuk KEPUTUSAN, agent boleh MENGUKUR)
+> **PRIORITAS REVIEWER (arahan pengguna "kuatkan pondasi, jangan berpacu"):**
+> JANGAN loncat ke T6 (deploy) / T7 (finalisasi). Urutan yang benar sekarang:
+> 1. **Bawa `GATE_DECISION_GNN.md` ke tim** untuk ratifikasi resmi (manusia isi
+>    kotak keputusan). Tanpa ini, T1.13/T1.16 belum sah.
+> 2. **Perkuat fondasi test**: tambah test integrasi endpoint (`/health`,
+>    `/simulate` kedua mode, `/model-info`, `/compounds`, `/validate-smiles`) —
+>    saat ini hanya ada unit chem + kontrak triase. Endpoint belum ada test.
+> 3. **Draft `docs/REQUEST_VALIDASI_FARMASI.md` (T0.8)** + eskalasi dosen
+>    pembimbing — ini satu-satunya jalan membuka Mesin A + nama gugus. Belum
+>    dikerjakan siapa pun.
+> 4. Baru setelah gerbang diratifikasi + fondasi mantap: jalankan ulang T1.16
+>    (sekali), lalu T7.1 model card dengan angka resmi.
+>
+> Tabel di bawah adalah daftar sisa task apa adanya — bukan urutan pengerjaan.
 
-```
-Dasar : PRD §13 item #4 · Arsitektur §D.5
-File  : docs/GATE_DECISION_GNN.md (baru)
-```
+| Task | Status | Keterangan |
+|---|---|---|
+| T3.2 | DONE | Test kontrak heatmap_generik sudah ada |
+| T4.1 | BLOCKED-HUMAN | Data panel nomogram (butuh T2.6) |
+| T4.3 | BLOCKED-HUMAN | Disclaimer dinamis (PRD §14.2) |
+| T5.1 | TODO | Precompute demo set (~50 senyawa) |
+| T5.2 | TODO | Verifikasi stabilitas |
+| T6.1 | TODO | Dockerfile |
+| T6.2 | TODO | Rate limiting + CORS |
+| T6.3 | TODO | Deploy Railway |
+| T6.4 | TODO | Keep-alive cron |
+| T6.5 | TODO | E2E test |
+| T7.1 | TODO | Model card |
+| T7.2 | TODO | API docs |
+| T7.3 | TODO | NOTICE.md (dependensi pihak ketiga) |
+| T7.4 | TODO | External validation report final |
 
-Agent boleh mengukur & menyusun tabel (AUROC GNN vs baseline, ukuran Docker
-image, waktu inferensi, dll — lihat kriteria lengkap di
-`EXECUTION_PLAN.md` T1.11). **Keputusan pivot `ML_BACKEND=gnn` vs `=tabular`
-BUKAN keputusan agent** — laporkan tabel hasil, minta keputusan tim.
+### 3.3 Task yang TIDAK BOLEH dikerjakan agent (BLOCKED-HUMAN)
 
-### 3.4 T1.12–T1.14 — Predictor interface, latih model final, explainability
-
-- `DILIBackend` Protocol (`predict_proba`, `explain`), dua implementasi
-  (`backend_tabular`, `backend_gnn`) sama-sama memenuhi Protocol.
-- `model_meta.json` — `metrics` **HARUS `null`** sampai T1.16 dijalankan.
-  Jangan isi angka apa pun sebelum itu (AGENTS.md §3.3).
-- Explainability: SHAP → filter hanya fitur `smarts::` yang lolos
-  `validated_library()` (saat ini KOSONG → output harus list kosong, bukan
-  error, bukan indeks numerik).
-
-### 3.5 T1.16 — Validasi eksternal (KRITIS, SEKALI SAJA)
-
-Baca `EXECUTION_PLAN.md` T1.16 dan `AGENTS.md` §3.4 berkali-kali sebelum
-menyentuh `external_test.csv`. Setelah dibuka, DILARANG menyetel model
-berdasarkan hasilnya. Tabel pembanding wajib menyertakan baseline Mostafa et
-al. (2024): akurasi 0,631 · MCC 0,245.
-
-### 3.6 T1.17–T1.18 — endpoint `/model-info`, integrasi ke `/simulate`
-
-Ganti bobot random `HybridAIEngine` dengan model terlatih asli. Update
-`model_status` logic bila perlu (kemungkinan tidak perlu berubah, sudah benar
-strukturnya).
-
-### 3.7 Test coverage yang HILANG (gap penting, prioritas tinggi meski di luar sprint 1)
-
-`docs/Claude.md` §8 sendiri bilang: *"Dua test yang paling bernilai dan paling
-sering dilupakan: assert nol overlap dan assert heatmap_generik."* **Kedua
-test itu BELUM ADA sebagai automated test**, baru diverifikasi manual sesi
-ini:
-
-- `tests/test_contract.py` (T3.2) — assert `visual_pattern` mode triase
-  SELALU `"heatmap_generik"` untuk berbagai SMILES. **Test paling penting
-  yang belum ditulis.**
-- `tests/test_data_integrity.py` (T1.6) — assert nol overlap InChIKey blok-1
-  train↔external_test secara otomatis (bukan cuma manual check sesi ini).
-- Tidak ada test integrasi untuk endpoint (`/health`, `/simulate`,
-  `/compounds`) sama sekali.
+| Item | Terblokir oleh | File terkait |
+|---|---|---|
+| Isi `PD_CONSTANTS` (Mesin A) | Farmasi, PRD §13 #1 | `pkpd_engine.py` |
+| Bentuk persamaan GSH eksplisit | Farmasi | `pkpd_engine.py` |
+| Parameter nomogram 150/200 | Farmasi | `pkpd_engine.py` |
+| Isi `SMARTS_VALIDATED_BY_PHARMACY` | Farmasi (ACC tertulis) | `app/chem/smarts_library.py` |
+| T1.15 kalibrasi + AD | Ketua Tim + Farmasi | belum ada file |
+| TA.4 item #3 (field engine/model_version/dll) | Ketua Tim | `app/models/schemas.py` |
+| Teks disclaimer | PRD §14.2 non-negotiable | `simulation_orchestrator.py` |
 
 ---
 
@@ -309,20 +312,11 @@ belum dikerjakan siapa pun, bisa jadi task independen kapan saja.
 
 ## 5. TEMUAN TAMBAHAN — dilaporkan, belum diperbaiki (butuh keputusan/prioritisasi)
 
-### 5.1 Bug kemungkinan di `pkpd_engine.py` — kasus singular `ka == ke`
+### 5.1 Bug `pkpd_engine.py` — kasus singular `ka == ke` — SUDAH DIPERBAIKI
 
-`calculate_oral_absorption()` baris ~79:
-```python
-if time_hours <= lag_time_hr or (ka - ke) == 0:
-    return 0.0
-```
-PRD §8.1 dan Arsitektur §C.1 mensyaratkan: bila `abs(ka - ke) < 1e-6`, pakai
-**bentuk limit** `(F·Dose·ka·t/Vd)·exp(-ke·t)`, BUKAN mengembalikan 0.0 begitu
-saja. Dengan nilai KA=3.47/KE=0.55 saat ini bug ini tidak aktif (ka≠ke), tapi
-kalau parameter berubah nanti (mis. setelah validasi Farmasi), hasilnya akan
-salah secara diam-diam tanpa error. **Belum diperbaiki sesi ini** — di luar
-cakupan kerja yang sedang berjalan saat ditemukan. Prioritaskan sebelum T2.x
-manapun disentuh.
+`calculate_oral_absorption()` sekarang menggunakan bentuk limit
+`(F·Dose·ka·t/Vd)·exp(-ke·t)` saat `abs(ka - ke) < 1e-6`, sesuai
+Arsitektur §C.1.
 
 ### 5.2 `openapi.json` di root repo korup
 
@@ -339,12 +333,10 @@ memakainya lagi. Belum diputuskan: hapus, atau biarkan dengan komentar
 deprecated yang mengarahkan ke pengganti barunya. **Tanyakan ke user**, jangan
 hapus sepihak (mungkin ada alasan dipertahankan yang tidak diketahui agent).
 
-### 5.4 `EXECUTION_PLAN.md` belum direkonsiliasi statusnya
+### 5.4 `EXECUTION_PLAN.md` — SUDAH DIREKONSILIASI
 
-`docs/AUDIT_TASKS.md` Bagian 4 meminta status task T0.2/T0.3/T0.4/T0.6/T0.7 di
-`EXECUTION_PLAN.md` ditandai `DONE` (sudah setara terpenuhi lewat audit TA.x)
-dengan catatan menunjuk task TA yang menyelesaikannya. **Belum dikerjakan.**
-Ini murni dokumentasi, aman dikerjakan kapan saja, tidak butuh keputusan tim.
+Status task T0.1–T2.2, T3.1–T3.3, T4.2 ditandai `DONE` dengan checklist ✓.
+Catatan penyesuaian path (struktur flat AUDIT_TASKS §TA.0.1) ditambahkan.
 
 ---
 
