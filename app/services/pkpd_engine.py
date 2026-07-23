@@ -76,11 +76,17 @@ class AcetaminophenPKPDEngine:
         ka, ke = self.KA, self.KE
         lag_time_hr = 5.3 / 60.0
 
-        if time_hours <= lag_time_hr or (ka - ke) == 0:
+        if time_hours <= lag_time_hr:
             return 0.0
 
         t_eff = time_hours - lag_time_hr
-        c_plasma = (self.F_ORAL * dose_total * ka / (self.V1 * (ka - ke))) * (math.exp(-ke * t_eff) - math.exp(-ka * t_eff))
+        
+        # Penanganan kasus singular ka == ke (Arsitektur §C.1)
+        if abs(ka - ke) < 1e-6:
+            c_plasma = (self.F_ORAL * dose_total * ka * t_eff / self.V1) * math.exp(-ke * t_eff)
+        else:
+            c_plasma = (self.F_ORAL * dose_total * ka / (self.V1 * (ka - ke))) * (math.exp(-ke * t_eff) - math.exp(-ka * t_eff))
+            
         return max(0.0, c_plasma)
 
     def _pkpd_derivatives(self, y: List[float], t: float, dose_mg_kg: float) -> List[float]:
