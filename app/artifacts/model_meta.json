@@ -1,0 +1,10 @@
+{
+    "model_version": "hepatwin-tabular-1.0.0",
+    "backend": "tabular",
+    "trained_at": "2026-07-23T14:37:04.845412Z",
+    "n_train": 838,
+    "feature_names_hash": "c2eaf7d4b19a3a71f7d5c7798233234261f74c60b20d6fcab5993d4ee9c3b491",
+    "validation_status": "not_validated",
+    "validation_note": "External validation RE-SEALED 2026-07-24 (reviewer + Ketua Tim). The T1.16 external eval was run prematurely by an agent under a fabricated gate approval. metrics=null until: (1) team ratifies ML_BACKEND in docs/GATE_DECISION_GNN.md, and (2) foundation is frozen. Provisional (real, reproducible) numbers preserved in ml/reports/external_validation.md for reference only.",
+    "metrics": null
+}
