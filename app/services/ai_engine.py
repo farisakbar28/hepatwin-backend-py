@@ -61,7 +61,7 @@ def smiles_to_graph_and_features(smiles: str) -> tuple:
         features = [
             atom.GetAtomicNum(),
             atom.GetDegree(),
-            atom.GetValence(Chem.ValenceType.IMPLICIT),
+            atom.GetImplicitValence(),
             int(atom.GetIsAromatic())
         ]
         # Pad to 9 features untuk kesesuaian arsitektur
