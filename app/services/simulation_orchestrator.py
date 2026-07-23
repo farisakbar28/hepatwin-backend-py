@@ -1,17 +1,21 @@
 import logging
+import time
+
+from rdkit import Chem
 
 from app.core.config import settings
 from app.core.errors import RequestIncompleteError, SmilesInvalidError
 from app.models.schemas import SimulationRequest, SimulationResponse
-from app.services.ai_engine import HybridAIEngine
+from app.services.explain import explain_compound
 from app.services.pkpd_engine import AcetaminophenPKPDEngine
+from app.services.predictor import get_backend
 
 logger = logging.getLogger(__name__)
 
 class SimulationOrchestrator:
     def __init__(self):
         self.pkpd_engine = AcetaminophenPKPDEngine()
-        self.ai_engine = HybridAIEngine(model_path=settings.AI_MODEL_PATH)
+        self.ai_backend = get_backend()
 
     def handle_request(self, req: SimulationRequest) -> SimulationResponse:
         mode = req.mode
@@ -36,7 +40,13 @@ class SimulationOrchestrator:
             if not smiles:
                 raise RequestIncompleteError("smiles_string wajib untuk mode triase_umum")
 
-            if not self.ai_engine.validate_smiles(smiles):
+            try:
+                mol = Chem.MolFromSmiles(smiles)
+                valid = mol is not None
+            except Exception:
+                valid = False
+
+            if not valid:
                 raise SmilesInvalidError("smiles_string tidak valid")
 
             if settings.MOCK_MODE:
@@ -47,13 +57,25 @@ class SimulationOrchestrator:
     def _simulate_paracetamol(self, dose: float) -> SimulationResponse:
         time_series = self.pkpd_engine.simulate_napqi_gsh_dynamics(dose)
         nomogram = self.pkpd_engine.get_nomogram_data(dose)
-        score = self.ai_engine.predict_dili_risk("paracetamol_mock")
+        
+        # Paracetamol SMILES untuk inference real
+        apap_smiles = "CC(=O)NC1=CC=C(O)C=C1"
+        mol = Chem.MolFromSmiles(apap_smiles)
+        score = self.ai_backend.predict_proba(mol)
         
         risk_level = "low"
         if score > 0.66:
             risk_level = "high"
         elif score >= 0.33:
             risk_level = "medium"
+            
+        # Batasan model bersumber dari PRD §8.1 (Arsitektur §C.1)
+        limitations = [
+            "Model PK/PD menggunakan pendekatan satu-kompartemen (semula dua-kompartemen pada Morse et al. 2022).",
+            "Volume distribusi menggunakan V1 (43,5 L/70kg) sebagai pendekatan Vd.",
+            "Lag time absorpsi oral (5,3 menit) tidak dimasukkan ke dalam model.",
+            "Parameter PK/PD hanya divalidasi untuk sukarelawan dewasa sehat.",
+        ]
             
         return SimulationResponse(
             mode="edukasi_mendalam",
@@ -62,30 +84,39 @@ class SimulationOrchestrator:
             dose_mg_kg=dose,
             DILI_score=score,
             risk_level=risk_level,
-            damage_severity=min(1.0, dose / 150.0), # Simplifikasi proporsional dosis
+            damage_severity=min(1.0, dose / 150.0),
             compound_class="dose_dependent",
             model_confidence_note="Estimasi awal berbasis model riset, bukan hasil uji klinis.",
             disclaimer_permanent="HepaTwin adalah alat bantu edukasi dan triase awal, BUKAN pengganti uji toksisitas atau keputusan klinis.",
             disclaimer_hideable=True,
             affected_zone="Zone_3",
             supports_micro_zoom=True,
-            explainability=self.ai_engine.get_explainability("CC(=O)NC1=CC=C(O)C=C1"),
+            explainability=explain_compound(mol),
             visual_pattern="centrilobular_necrosis",
             time_series_pkpd=time_series,
             nomogram_data=nomogram,
-            model_status=self.ai_engine.model_status
+            model_status=self.ai_backend.model_status,
+            model_limitations=limitations,
         )
 
     def _simulate_amox_clav(self, dose: float) -> SimulationResponse:
-        score = self.ai_engine.predict_dili_risk("amox_mock")
-        # Use the correct Amoxicillin SMILES string for SHAP explainability
+        # Use the correct Amoxicillin SMILES string for inference
         amox_smiles = "CC1(C)SC2C(NC(=O)C(N)c3ccc(O)cc3)C(=O)N12"
+        mol = Chem.MolFromSmiles(amox_smiles)
+        score = self.ai_backend.predict_proba(mol)
         
         risk_level = "low"
         if score > 0.66:
             risk_level = "high"
         elif score >= 0.33:
             risk_level = "medium"
+            
+        # Batasan model: amox-clav skor AI-driven (Arsitektur §B.2)
+        limitations = [
+            "Skor risiko dihasilkan oleh model AI tabular, bukan model PK/PD.",
+            "Model dilatih pada dataset DILIrank dan divalidasi pada dataset Xu et al. (2015).",
+            "Skor mencerminkan probabilitas DILI concern berdasarkan struktur kimia, bukan mekanisme spesifik.",
+        ]
             
         return SimulationResponse(
             mode="edukasi_mendalam",
@@ -94,28 +125,54 @@ class SimulationOrchestrator:
             dose_mg_kg=dose,
             DILI_score=score,
             risk_level=risk_level,
-            damage_severity=score, # Damage driven by AI score
+            damage_severity=score,
             compound_class="idiosyncratic",
             model_confidence_note="Estimasi awal berbasis model riset, bukan hasil uji klinis.",
             disclaimer_permanent="HepaTwin adalah alat bantu edukasi dan triase awal, BUKAN pengganti uji toksisitas atau keputusan klinis.",
             disclaimer_hideable=True,
             affected_zone="Portal_Periportal",
             supports_micro_zoom=True,
-            explainability=self.ai_engine.get_explainability(amox_smiles),
+            explainability=explain_compound(mol),
             visual_pattern="portal_inflammation",
             time_series_pkpd=None,
             nomogram_data=None,
-            model_status=self.ai_engine.model_status
+            model_status=self.ai_backend.model_status,
+            model_limitations=limitations,
         )
 
     def _simulate_triase(self, smiles: str) -> SimulationResponse:
-        score = self.ai_engine.predict_dili_risk(smiles)
+        # Timing untuk optimasi NFR PRD §6 (< 5 detik mode triase)
+        t0 = time.perf_counter()
+        
+        mol = Chem.MolFromSmiles(smiles)
+        t_parse = time.perf_counter()
+        
+        score = self.ai_backend.predict_proba(mol)
+        t_predict = time.perf_counter()
+        
+        expl = explain_compound(mol)
+        t_explain = time.perf_counter()
+        
+        logger.info(
+            "Triase timing: parse=%.3fms predict=%.3fms explain=%.3fms total=%.3fms",
+            (t_parse - t0) * 1000,
+            (t_predict - t_parse) * 1000,
+            (t_explain - t_predict) * 1000,
+            (t_explain - t0) * 1000,
+        )
         
         risk_level = "low"
         if score > 0.66:
             risk_level = "high"
         elif score >= 0.33:
             risk_level = "medium"
+            
+        # Batasan model untuk mode triase (Arsitektur §E.3)
+        limitations = [
+            "Skor berbasis model riset yang dilatih pada dataset obat terbatas, bukan hasil uji klinis.",
+            "Mode triase tidak menentukan pola mekanisme spesifik (hepatoselular vs kolestatik).",
+            "Heatmap yang ditampilkan bersifat generik dan bukan representasi histologis sebenarnya.",
+        ]
             
         return SimulationResponse(
             mode="triase_umum",
@@ -124,18 +181,19 @@ class SimulationOrchestrator:
             dose_mg_kg=None,
             DILI_score=score,
             risk_level=risk_level,
-            damage_severity=score, # Damage driven by AI score
+            damage_severity=score,
             compound_class="unknown_general",
             model_confidence_note="Estimasi awal berbasis model riset, bukan hasil uji klinis.",
             disclaimer_permanent="Skor ini adalah estimasi awal berbasis model riset (AUC eksternal ~0,75-0,85), BUKAN hasil uji toksisitas dan BUKAN dasar keputusan keamanan obat.",
             disclaimer_hideable=False,
             affected_zone="Macro_Generic",
             supports_micro_zoom=False,
-            explainability=self.ai_engine.get_explainability(smiles),
+            explainability=expl,
             visual_pattern="heatmap_generik",
             time_series_pkpd=None,
             nomogram_data=None,
-            model_status=self.ai_engine.model_status
+            model_status=self.ai_backend.model_status,
+            model_limitations=limitations,
         )
 
     def _simulate_mock(self, req: SimulationRequest, dose: float) -> SimulationResponse:

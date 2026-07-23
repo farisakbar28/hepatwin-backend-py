@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:3000"]
     AI_MODEL_PATH: str = "models/model.pt"
+    ARTIFACTS_DIR: str = "app/artifacts"
+    ML_BACKEND: str = "tabular"  # 'tabular' atau 'gnn'
     CACHE_DB_PATH: str = "cache.db"
     DEBUG: bool = False
     # JANGAN aktifkan di produksi. Bila True, /simulate mengembalikan response

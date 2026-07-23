@@ -59,3 +59,11 @@ class SimulationResponse(BaseModel):
     )
     time_series_pkpd: Optional[List[Dict[str, Any]]] = Field(None, description="Data plot grafik NAPQI/GSH.")
     nomogram_data: Optional[List[Dict[str, Any]]] = Field(None, description="Data plot klinis Rumack-Matthew.")
+    model_limitations: List[str] = Field(
+        default_factory=list,
+        description=(
+            "[EKSTENSI] Daftar batasan model yang berlaku untuk respons ini. "
+            "Teks bersumber dari PRD §8.1 (untuk parasetamol) dan batasan cakupan model. "
+            "Ditampilkan frontend di panel batasan model."
+        ),
+    )
