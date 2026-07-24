@@ -4,7 +4,11 @@ import time
 from rdkit import Chem
 
 from app.core.config import settings
-from app.core.errors import RequestIncompleteError, SmilesInvalidError
+from app.core.errors import (
+    ModelUnavailableError,
+    RequestIncompleteError,
+    SmilesInvalidError,
+)
 from app.models.schemas import SimulationRequest, SimulationResponse
 from app.services.explain import explain_compound
 from app.services.pkpd_engine import AcetaminophenPKPDEngine
@@ -55,9 +59,21 @@ class SimulationOrchestrator:
             return self._simulate_triase(smiles)
 
     def _simulate_paracetamol(self, dose: float) -> SimulationResponse:
-        time_series = self.pkpd_engine.simulate_napqi_gsh_dynamics(dose)
-        nomogram = self.pkpd_engine.get_nomogram_data(dose)
-        
+        # Mesin A (PK/PD) digembok sampai konstanta PD divalidasi Farmasi
+        # (PRD §13 #1). Ubah gerbang RuntimeError/NotImplementedError menjadi error
+        # typed yang jelas (503 E_MODEL_UNAVAILABLE) alih-alih 500 generik, supaya
+        # frontend bisa menampilkan pesan yang benar. Ini TIDAK mengisi konstanta
+        # atau melemahkan gerbang — hanya menyurfacekan keadaan tergembok dg rapi.
+        try:
+            time_series = self.pkpd_engine.simulate_napqi_gsh_dynamics(dose)
+            nomogram = self.pkpd_engine.get_nomogram_data(dose)
+        except (RuntimeError, NotImplementedError) as exc:
+            logger.warning("Mesin A parasetamol belum siap: %s", exc)
+            raise ModelUnavailableError(
+                "Mode Edukasi parasetamol (Mesin A PK/PD) belum tersedia — konstanta "
+                "farmakologi menunggu validasi anggota Farmasi (PRD §13 item #1)."
+            ) from exc
+
         # Paracetamol SMILES untuk inference real
         apap_smiles = "CC(=O)NC1=CC=C(O)C=C1"
         mol = Chem.MolFromSmiles(apap_smiles)
