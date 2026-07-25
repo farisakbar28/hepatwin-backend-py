@@ -60,8 +60,8 @@ eksplisit, jangan disembunyikan.
 ### Kotak keputusan tim — DIISI MANUSIA, JANGAN DIISI AGENT
 
 ```
-Keputusan ML_BACKEND : [ ] tabular    [ ] gnn      (centang salah satu)
-Diputuskan oleh      : ____________________ (nama, peran)
-Tanggal              : ____________________
-Justifikasi          : _________________________________________________
+Keputusan ML_BACKEND : [✔] tabular    [ ] gnn      (centang salah satu)
+Diputuskan oleh      : Muhammad Faris Akbar, Ketua Tim
+Tanggal              : 25/07/2026
+Justifikasi          : GNN kalah di hampir semua metrik (akurasi, MCC, sensitivitas)
 ```
