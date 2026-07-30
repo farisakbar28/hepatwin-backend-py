@@ -264,14 +264,35 @@ Ikuti spesifikasi v2.0 apa adanya (path sudah diberi prefix `ml/` di atas), deng
 
 ## Ringkasan Gerbang Manusia (revisi)
 
-| Gerbang | Pertanyaan | Ke siapa | Memblokir |
-|---|---|---|---|
-| **B2** | vLess-DILI-concern → positif atau dibuang? | Farmasi | TU.3 |
-| **B3** | Amox-clav ada di kelas mana? Ikut terbuang? | Farmasi | TU.3 |
-| **B4** | SMILES amox-clav: pecah atau ambil fragmen utama? | Farmasi + AI/ML | TU.6 |
-| **B5** | Daftar & penamaan SMARTS final | Farmasi | TU.11 |
-| **B6** *(baru, hanya untuk TU.17)* | Daftar istilah MedDRA hepatotoksisitas untuk FAERS | Farmasi | TU.17 saja, tidak memblokir apa pun di jalur utama |
+| Gerbang | Pertanyaan | Ke siapa | Memblokir | Status |
+|---|---|---|---|---|
+| **B2** | vLess-DILI-concern → positif atau dibuang? | Farmasi | TU.3 | 🤖 Di-bypass sementara oleh AI — lihat §14.1 |
+| **B3** | Amox-clav ada di kelas mana? Ikut terbuang? | Farmasi | TU.3 | ✅ Tidak relevan untuk Arm A — lihat §14.1 (temuan data, bukan bypass) |
+| **B4** | SMILES amox-clav: pecah atau ambil fragmen utama? | Farmasi + AI/ML | TU.6 | 🤖 Di-bypass sementara oleh AI — lihat §14.1 |
+| **B5** | Daftar & penamaan SMARTS final | Farmasi | TU.11 | 🤖 Akan di-bypass sementara oleh AI saat TU.11 dikerjakan — lihat §14.1 |
+| **B6** *(baru, hanya untuk TU.17)* | Daftar istilah MedDRA hepatotoksisitas untuk FAERS | Farmasi | TU.17 saja, tidak memblokir apa pun di jalur utama | Belum dikerjakan (stretch) |
 
 ~~B1~~ **selesai** — Arm B sudah final = DILIrank + LiverTox, tidak lagi menunggu keputusan.
 
 Dibanding v1.0: jalur utama (TU.0–TU.15) sekarang jauh lebih sedikit terblokir. Hanya TU.3 dan TU.11 yang benar-benar menunggu manusia; TU.6 sebagian (B4 memengaruhi featurisasi amox-clav, tapi tidak menghentikan seluruh task).
+
+---
+
+## §14.1 — Kebijakan Bypass Gerbang Manusia oleh AI (ditambahkan 2026-07-31)
+
+**Konteks:** Atas instruksi pemilik repo, gerbang B2/B3/B4/B5 di-bypass agar pipeline TU.1–TU.17 bisa berjalan tanpa menunggu jadwal review anggota Farmasi. **Ini bukan pengganti validasi Farmasi** — Definition of Done (§11 UPSCALE.md) tetap mensyaratkan tanda tangan Farmasi untuk daftar SMARTS dan skema label sebelum rilis final. Keputusan di bawah ini berstatus **sementara/provisional**, harus ditinjau ulang sebelum dianggap final, dan **wajib ditandai jelas di setiap laporan (`ml/reports/*.md`) yang memakainya** dengan label `[KEPUTUSAN AI — PENDING REVIEW FARMASI]`.
+
+| Gerbang | Keputusan sementara AI | Dasar | Perlu dikonfirmasi Farmasi karena |
+|---|---|---|---|
+| **B2** | `vMost-DILI-concern` + `vLess-DILI-concern` = label positif (1), `vNo-DILI-concern` = negatif (0), `Ambiguous-DILI-concern` dibuang | Ini memang sudah jadi default yang tertulis di UPSCALE.md §3.2 sejak v1.0 ("sama seperti v1.0"), dan konsisten dengan skema yang dipakai literatur DILI-ML yang jadi rujukan arsitektur (Yang et al. 2024, Wibowo et al. 2025) | vLess mencampur senyawa dengan bukti hepatotoksisitas lemah/tidak konklusif — signifikansi klinis vs. label FDA aktual perlu dinilai oleh yang paham farmakovigilans, bukan cuma preseden literatur |
+| **B3** | Tidak ada keputusan yang diperlukan untuk Arm A — DILIrank 2.0 tidak memuat entri kombinasi amoxicillin-clavulanate sama sekali (diverifikasi langsung: 0 baris cocok pola `clavulan`, lihat `ml/reports/01_dilirank_inspection.md`). Pertanyaan ini baru relevan lagi di TU.12 (Arm B, lewat LiverTox) | Temuan data langsung, bukan judgment call | Saat amox-clav muncul via LiverTox di Arm B, klasifikasi & keikutsertaannya tetap perlu ditinjau Farmasi |
+| **B4** | Representasi SMILES amox-clav (saat muncul di Arm B): pakai **kedua fragmen** sebagai satu SMILES multi-komponen (`fragmen_amoxicillin.fragmen_clavulanat`), bukan memilih salah satu | Mempertahankan ruang kimia riil senyawa kombinasi tanpa perlu menentukan "fragmen mana yang lebih bertanggung jawab" atas toksisitas — keputusan itu sendiri butuh literatur farmakologi spesifik | Kontribusi relatif tiap fragmen terhadap sinyal DILI adalah pertanyaan farmakologis yang butuh literatur/pendapat ahli, bukan cuma representasi kimia |
+| **B5** | Belum diputuskan — akan memakai daftar SMARTS/toxicophore dari literatur DILI-SAR yang sudah dipublikasi (bukan daftar buatan sendiri) saat TU.11 dikerjakan, dengan penandaan `[KEPUTUSAN AI — PENDING REVIEW FARMASI]` di laporan explainability | Placeholder — belum ada keputusan konkret sampai TU.11 dimulai | Nama & interpretasi klinis tiap pola SMARTS wajib divalidasi sebelum dipakai di UI/laporan yang dilihat pengguna |
+
+**Aturan turunan untuk seluruh task selanjutnya:** setiap kali TU.3, TU.6, atau TU.11 menghasilkan artefak yang bergantung pada keputusan di atas, file laporan terkait wajib mencantumkan baris:
+
+```
+> ⚠️ [KEPUTUSAN AI — PENDING REVIEW FARMASI]: <ringkasan keputusan spesifik + baris tabel di atas yang jadi rujukan>
+```
+
+Ini supaya siapa pun yang membaca laporan (termasuk ketua tim/Farmasi nanti) langsung tahu bagian mana yang masih perlu ditinjau, tanpa perlu membaca ulang dokumen ini.
