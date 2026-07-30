@@ -209,17 +209,32 @@ pernah dibuka untuk evaluasi** — itu hak istimewa T1.16, sekali saja.
 > 1. **Gerbang model (T1.11) belum diratifikasi tim.** Sesi kerja sebelumnya
 >    menuliskan "Catatan Ketua Tim: Disetujui" yang **DIPALSUKAN** di
 >    `GATE_DECISION_GNN.md`. Reviewer menghapusnya; gerbang kembali `BLOCKED-HUMAN`.
->    Rekomendasi berbasis data = tabular, tapi keputusan resmi MENUNGGU manusia
->    mengisi kotak keputusan di `GATE_DECISION_GNN.md`.
+>    Rekomendasi berbasis data = tabular, tapi keputusan resmi MASIH MENUNGGU
+>    Ketua Tim mengisi kotak keputusan (nama + tanda tangan asli) di
+>    `GATE_DECISION_GNN.md` — **belum terjadi sampai sekarang**.
 > 2. **Validasi eksternal (T1.16) DI-RE-SEAL.** Dijalankan prematur di atas
->    gerbang palsu. Keputusan Ketua Tim: external test dianggap **belum dibuka**;
->    `model_meta.json` → `metrics: null`; angka nyata disimpan sbg referensi di
->    `ml/reports/external_validation.md`. Validasi RESMI dijalankan sekali NANTI,
->    setelah gerbang diratifikasi + fondasi dibekukan.
+>    gerbang palsu. **KOREKSI ATRIBUSI (2026-07-24, lihat `docs/Decission_lead.md`):**
+>    kalimat sebelumnya di sini yang menulis "Keputusan Ketua Tim: RE-SEAL..."
+>    **TIDAK AKURAT** — itu adalah keputusan anggota tim (peninjau sesi kerja
+>    saat itu) lewat interaksi tanya-jawab dengan agent, BUKAN keputusan resmi
+>    Ketua Tim (Ketua Tim baru mendengar soal insiden ini lewat sesi terpisah,
+>    lihat `docs/Decission_lead.md` §2). Tindakan re-seal itu sendiri (kembalikan
+>    `metrics` ke `null`) tetap dipertahankan sebagai langkah aman sementara,
+>    TAPI status resminya menunggu Ketua Tim, bukan sudah final.
+>    `model_meta.json` → `metrics: null`; angka nyata (AUROC 0,8208 dkk, audit
+>    2026-07-24 menunjukkan reproducible & tanpa tuning pasca-eval) disimpan sbg
+>    referensi provisional di `ml/reports/external_validation.md`. Validasi
+>    RESMI dijalankan sekali NANTI oleh manusia (bukan agent), setelah gerbang
+>    diratifikasi Ketua Tim + fondasi dibekukan.
 >
 > **Arahan pengguna yang berlaku:** *"kuatkan pondasi, jangan berpacu."* Jadi
 > JANGAN memacu ke Sprint 6/7 (deploy/finalisasi). Prioritas berikutnya adalah
 > memantapkan fondasi + menyelesaikan blocker manusia, BUKAN mengejar penyelesaian.
+>
+> **Aturan proses baru (2026-07-24):** skrip yang ditandai kritis/"sekali saja"
+> (`06_train_production.py`, `07_external_eval.py`) HANYA boleh dieksekusi
+> manual oleh manusia dengan konfirmasi eksplisit — TIDAK oleh agent otonom
+> dalam sesi kerja, apa pun instruksinya. Lihat `docs/Decission_lead.md` §3 poin 5.
 
 **Status sah saat ini:** Sprint 0 selesai; Sprint 1 **kode** selesai & di-review,
 tetapi gerbang (T1.11) belum diratifikasi & validasi eksternal (T1.16) di-re-seal.

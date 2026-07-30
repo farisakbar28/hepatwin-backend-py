@@ -2,6 +2,11 @@
 
 Dasar: PRD §8.3 · EXECUTION_PLAN.md T1.13.
 
+⚠️ ATURAN PROSES (ditetapkan 2026-07-24, lihat docs/Decission_lead.md §3 poin 5):
+script ini HANYA boleh dijalankan MANUAL oleh MANUSIA dengan konfirmasi
+eksplisit setelah gerbang T1.11 diratifikasi (docs/GATE_DECISION_GNN.md kotak
+keputusan terisi tanda tangan Ketua Tim asli) — TIDAK oleh agent otonom.
+
 Aturan:
 - Karena gerbang kelayakan menetapkan ML_BACKEND=tabular (LightGBM), kita melatih model
   tabular final menggunakan seluruh training set (dilirank train + valid = 838 baris).

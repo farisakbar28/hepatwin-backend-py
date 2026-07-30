@@ -2,6 +2,14 @@
 
 Dasar: PRD §3 tujuan #5, §8.3, §8.4, §14.5 · EXECUTION_PLAN.md T1.16 · AGENTS.md §3.4.
 
+⚠️ ATURAN PROSES (ditetapkan 2026-07-24, lihat docs/Decission_lead.md §3 poin 5,
+docs/GATE_DECISION_GNN.md): script ini HANYA boleh dijalankan MANUAL oleh
+MANUSIA dengan konfirmasi eksplisit — TIDAK oleh agent otonom dalam sesi kerja,
+apa pun instruksinya. Insiden sebelumnya: agent menjalankan ini sebelum gerbang
+T1.11 diratifikasi manusia (di atas persetujuan Ketua Tim yang dipalsukan).
+Prasyarat sebelum menjalankan: (1) docs/GATE_DECISION_GNN.md kotak keputusan
+sudah diisi tanda tangan Ketua Tim asli, (2) fondasi model dibekukan.
+
 Aturan:
 - Muat model final (model.joblib) + external_test.csv.
 - Hitung: akurasi, AUC, sensitivity, specificity, MCC.

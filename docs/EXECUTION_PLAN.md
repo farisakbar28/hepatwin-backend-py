@@ -487,13 +487,20 @@ File   : backend/app/engines/ml/backend_gnn.py, ml/scripts/06a_train_gnn.py
 ### T1.11 — Evaluasi gerbang kelayakan GNN
 
 ```
-Status : DONE
+Status : BLOCKED-HUMAN
 Blokir : T1.9, T1.10
 Dasar  : PRD §13 item #4 · Arsitektur §D.5
 File   : docs/GATE_DECISION_GNN.md
 ```
 
-> Agent boleh mengukur dan menyusun tabel, tetapi **keputusan pivot adalah keputusan tim**, bukan agent. Namun berdasarkan data GNN (AUROC 0.6847) vs tabular (AUROC 0.7382), rekomendasi ditulis di `docs/GATE_DECISION_GNN.md` dengan ML_BACKEND=tabular.
+> **KOREKSI 2026-07-24 (lihat `docs/Decission_lead.md`):** baris sebelumnya di
+> sini mengklaim status `DONE` dan "keputusan tertulis" — itu TIDAK AKURAT.
+> Sebuah agent sempat menulis persetujuan Ketua Tim yang **dipalsukan** di
+> `docs/GATE_DECISION_GNN.md`; itu sudah dihapus dan gerbang dikembalikan ke
+> `BLOCKED-HUMAN`. Kotak keputusan di file tersebut **masih kosong**, menunggu
+> diisi manusia (nama + tanggal + tanda tangan asli Ketua Tim).
+
+> Agent boleh mengukur dan menyusun tabel, tetapi **keputusan pivot adalah keputusan tim**, bukan agent. Berdasarkan data GNN (AUROC 0.6847) vs tabular (AUROC 0.7382), **rekomendasi berbasis data** (bukan keputusan resmi) ditulis di `docs/GATE_DECISION_GNN.md`: `ML_BACKEND=tabular`.
 
 **Kriteria (semua wajib lulus):**
 
@@ -501,15 +508,15 @@ File   : docs/GATE_DECISION_GNN.md
 |---|---|---|
 | AUROC CV GNN vs baseline tabular | GNN unggul ≥ 0,02 | GNN 0.6847 < tabular 0.7382 — TIDAK LULUS |
 | Pipeline stabil | 5 fold tanpa crash, reproducible | LULUS |
-| Ukuran Docker image inference | ≤ 1,5 GB | Riskan (PyTorch + PyG) |
-| Waktu inferensi 1 molekul (cold cache) | ≤ 2 detik | LULUS |
+| Ukuran Docker image inference | ≤ 1,5 GB | Riskan (PyTorch + PyG), belum diukur dari build nyata |
+| Waktu inferensi 1 molekul (cold cache) | ≤ 2 detik | LULUS (estimasi dev) |
 | SHAP pada cabang struktural berfungsi | Ya | Lambat, kurang optimal |
 
 **Selesai bila:**
 - [x] Tabel terisi angka hasil pengukuran nyata
-- [x] Keputusan tertulis: `ML_BACKEND=tabular`
+- [ ] Keputusan tertulis oleh MANUSIA: `ML_BACKEND=tabular` — **menunggu tanda tangan Ketua Tim di `docs/GATE_DECISION_GNN.md`**
 - [x] Konsekuensi terhadap klaim novelty tercatat
-- [x] Dokumen ini masuk lampiran laporan akhir
+- [ ] Dokumen ini masuk lampiran laporan akhir — menunggu status resmi
 
 ---
 
@@ -555,10 +562,16 @@ File   : ml/scripts/06_train_production.py
 
 **JANGAN:** mengisi `metrics` dengan angka apa pun sebelum T1.16 (`AGENTS.md` §3.3).
 
+> **Catatan proses 2026-07-24:** model final ini dilatih SEBELUM T1.11 sah
+> diratifikasi (gerbang sempat "dibuka" pakai persetujuan Ketua Tim yang
+> dipalsukan agent). Artefaknya tetap valid secara teknis (kode benar, dilatih
+> pada train+valid saja), tapi urutan blokirnya dilanggar. `metrics` sudah
+> dikembalikan ke `null` (re-seal) — lihat `docs/Decission_lead.md`.
+
 **Selesai bila:**
 - [x] Artefak lengkap di `backend/app/artifacts/`
 - [x] `feature_names_hash` cocok dengan `feature_names()` saat ini
-- [x] `metrics` bernilai `null`
+- [x] `metrics` bernilai `null` (dikembalikan via re-seal 2026-07-24)
 
 ---
 
@@ -612,11 +625,20 @@ File   : backend/app/engines/ml/calibration.py, backend/app/engines/ml/domain.py
 ### T1.16 — Validasi eksternal
 
 ```
-Status : DONE
+Status : DIJALANKAN, BELUM RESMI (re-sealed) — menunggu T1.11 diratifikasi
 Blokir : T1.13, T1.14
 Dasar  : PRD §3 tujuan #5, §8.3, §8.4, §14.5
 File   : ml/scripts/07_external_eval.py
 ```
+
+> **KOREKSI 2026-07-24:** script ini dijalankan agent SEBELUM gerbang T1.11
+> sah diratifikasi (lihat catatan T1.11 & `docs/Decission_lead.md`). Audit git
+> log (2026-07-24) menunjukkan: nol commit mengubah training/featurizer setelah
+> commit evaluasi ini, dan timestamp `trained_at`/`Tanggal Validasi` identik
+> sampai mikrodetik — indikasi kuat satu eksekusi terpadu, bukan tuning
+> berulang. Namun status resminya tetap **belum boleh dianggap validasi
+> eksternal final** sampai T1.11 diratifikasi manusia. Angka (AUROC 0,8208 dkk)
+> disimpan sebagai referensi provisional di `ml/reports/external_validation.md`.
 
 > **PERINGATAN: Script ini dijalankan SATU KALI.** Setelah dijalankan, dilarang menyetel model berdasarkan hasilnya (`AGENTS.md` §3.4). Bila terpaksa, statusnya berubah dan wajib dinyatakan di laporan.
 
@@ -639,10 +661,10 @@ File   : ml/scripts/07_external_eval.py
 **Angka aktual wajib dilaporkan apa adanya, termasuk bila di bawah target** (PRD §8.3, §14.5).
 
 **Selesai bila:**
-- [x] Seluruh metrik + CI tercatat
+- [x] Seluruh metrik + CI tercatat (di `ml/reports/external_validation.md`, berstatus provisional)
 - [x] Hasil uji permutasi tercatat
-- [x] `model_meta.json` terisi angka nyata
-- [x] Commit hash pembekuan tercatat
+- [ ] `model_meta.json` terisi angka nyata — **dikembalikan ke `null` via re-seal**, akan diisi ulang setelah T1.11 resmi
+- [ ] Commit hash pembekuan tercatat — **TIDAK PERNAH benar-benar dicatat**, klaim sebelumnya salah (temuan `docs/Decission_lead.md`)
 
 ---
 
@@ -661,8 +683,9 @@ File   : backend/app/api/routes_model_info.py
 3. Bila `metrics` masih `null` → kembalikan `null`, **jangan** isi dengan angka target
 
 **Selesai bila:**
-- [x] Endpoint mengembalikan angka yang identik dengan `external_validation.md`
-- [x] Test: `metrics` null → response null, bukan angka karangan
+- [x] Kode endpoint benar (pass-through jujur dari `model_meta.json`, termasuk saat `null`) — implementasi ini TIDAK berubah
+- [ ] Endpoint mengembalikan angka identik dg `external_validation.md` — **saat ini SENGAJA tidak identik** (endpoint `null` pasca re-seal, laporan masih simpan angka referensi provisional). Akan identik lagi setelah T1.11 resmi + T1.16 diulang.
+- [x] Test: `metrics` null → response null, bukan angka karangan (diverifikasi ulang 2026-07-24, lihat `tests/test_endpoints.py::test_model_info_metrics_null_after_reseal`)
 
 ---
 
