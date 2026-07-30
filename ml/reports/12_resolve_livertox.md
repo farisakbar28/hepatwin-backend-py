@@ -1,0 +1,216 @@
+# 02 -- Resolusi Nama -> SMILES (DILIrank 2.0)
+
+- Input: `ml/data/interim/_livertox_clean.csv` (1706 baris)
+- Output: `ml/data/interim/livertox_smiles.csv` (1304 baris)
+
+| Metrik | Jumlah |
+|---|---|
+| Berhasil resolve | 1304 |
+| -- di antaranya via fallback strip-garam | 1 |
+| Biologik dibuang (-mab/-cept/-ase/...) | 161 |
+| Gagal resolve | 241 |
+
+## Nama gagal resolve (dibiarkan kosong, TIDAK ditebak)
+
+- Agalsidase beta
+- Aldesleukin
+- Alglucosidase alfa
+- Aloe Vera
+- Amphetamines
+- Anakinra
+- Androgenic steroids
+- Apoaequorin
+- Arnica montana
+- Artecaine
+- Ashwagandha
+- Asparaginase erwinia
+- Astralgus
+- Attapulgite
+- Avacincaptad pegol
+- Avalglucosidase alfa
+- Avutometinib/defactinib
+- Ba Jiao Lian
+- Bacopa
+- Bee Pollen
+- Beeswax
+- Belantamab-Mafodotin
+- Belladonna
+- Bilberry
+- Bitter melon
+- Black cohosh
+- Black cumin seed
+- Boswellia serrata
+- Brentuximab Vedotin
+- Bromelain
+- Buchu
+- Butterbur
+- C1 Esterase Inh (Plasma)
+- C1 Esterase Inh (Recombinant)
+- Calaspargase Pegol
+- Capivasertinib
+- Casanthranol
+- Cascara
+- Casimersen
+- Castor Oil
+- Cat's Claw
+- Ceftibiprole Medocairil
+- Celandine
+- Centella
+- Chamomile
+- Chaparral
+- Chaste tree
+- Chi R Yun
+- Cholestyramine
+- Cobimetnib
+- Colesevelam
+- Colestipol
+- Cordyceps
+- Cordyceps
+- COVID-19 Drugs
+- COVID-19 Monoclonals
+- COVID-19 Vaccines
+- Cranberry
+- Crofelemer
+- Dalteparin
+- Darbepoetin
+- Datopotamab Deruxtecan
+- Defibrotide
+- Delandistrogene moxeparvovec
+- Denileukin diftitox
+- Diazepam, Intravenous
+- Diazepam, Oral
+- Dienogestrol
+- Donidalorsen
+- Doxecitine/Doxribtimine
+- Dragon's Blood
+- Drotrecogin
+- Dulaglutide
+- Echinacea
+- Efbemalenogratim
+- Efgartigimod Alfa/Hyalu
+- Efgartigimod-alfa
+- Eflapegastrim
+- Elamipretide HCl
+- Elosulfase alfa
+- Energy Drinks
+- Enfortumab Vedotin
+- Enoxaparin
+- Ephedra
+- Eplontersen
+- Erdafinitib
+- Ergot alkaloids
+- Estrogens (BCPs)
+- Eteplirsen
+- Eugenol (Clove Oil)
+- Fenugreek
+- Filgrastim
+- Fish oil
+- Fish oil triglycerides
+- Fitusiran
+- Flucoxacillin
+- Fomivirsen
+- Garcinia
+- Gemtuzumab ozogamicin
+- Gepotidacn
+- Germander
+- Ginger
+- Gingko
+- Ginseng
+- Givosiran
+- Glatiramer
+- Golodirsen
+- Grape seed
+- Green tea
+- Guarana
+- Gymnema
+- Hawthorn
+- Heparin
+- Herbalife
+- Hoodia
+- Hops
+- Horny Goat Weed
+- Horse chestnut
+- Horsetail
+- Hydroxycut
+- Hyssop
+- Inclisiran
+- Inotuzumab Ozogamicin
+- Interferon alfa
+- Interferon beta
+- Interferon gamma
+- Ivermectin
+- Jin Bu Huan
+- Khat
+- Kombucha Tea
+- Kratom
+- Lavender
+- Lemon balm
+- Lerodalchibep
+- Licorice
+- Lingzhi
+- Lion's mane
+- Lonapegsomatrophin
+- Loncastuximab-Tesirine
+- Lumasiran
+- Luteinizing Hormone
+- Maca
+- Mahogany seeds
+- Margosa Oil
+- Marijuana
+- Mavarixafor
+- Milk thistle
+- Mistletoe, American
+- Mistletoe, European
+- Moringa
+- Move Free
+- Muromonab
+- Naltrexone-Buproprion
+- Nedosiran
+- Nitroprusside
+- Noni
+- Nux vomica
+- Odesivimal
+- Olezarsen
+- Olipudase alfa
+- Omega 3 carboxylic acids
+- Omega 3 ethyl esters
+- Omega 3 fatty acids
+- Onasemnogene abeparvovec
+- Opium
+- Oprelvekin
+- Oregano
+- OxyElite Pro
+- Palifermin
+- Palopegteriparatide
+- Passionflower
+- Patisiran
+- Pegaptanib
+- Pegcetacoplan
+- Pegfilgrastim
+- Peginesatide
+- Peginterferon alfa
+- Penicillin G & V
+- Pennyroyal
+- Pentosan Polysulfate
+- Phenylbutyrate
+- Phenylbutyrate
+- Pine Bark
+- Piperacillin/Tazobactam
+- Plazomcin
+- Plozasiran
+- Polatuzumab Vedotin
+- Polygonum Multiflorum
+- Polythiazide
+- Progestins
+- Propolis
+- Red Yeast Rice
+- REGN-3EB
+- Ribocicib
+- Romiplostim
+- Royal Jelly
+- Sacituzumab Govitecan
+- Sargramostim
+- SARMS
+- SARMs
+
+... dan 41 lainnya
