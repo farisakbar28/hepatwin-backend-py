@@ -24,6 +24,7 @@ node_modules/
 
 # Python / Go (Virtual environments & binaries)
 venv/
+.venv/
 .env/
 /bin
 *.exe
@@ -115,7 +116,15 @@ opencode.json
 # ==========================================
 # 8. AI MODELS & WEIGHTS
 # ==========================================
-models/
+# ml/ pipeline: raw/interim data & intermediate models are reproducible, not committed
+ml/data/raw/
+ml/data/interim/
+ml/models/
+
+# Model weights are ignored by default, except the final artifacts served by app/
 *.pt
 *.pth
 *.h5
+!app/models/*.pt
+!app/models/*.pth
+!app/models/*.h5

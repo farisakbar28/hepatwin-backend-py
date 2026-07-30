@@ -1,3 +1,6 @@
+# OBSOLETE (branch upscale, UPSCALE.md v2.0): tanpa external test (K3), logika ini
+# digantikan ml/src/hepatwin_ml/data/build_dataset.py. Dibiarkan ada sebagai jejak
+# histori keputusan desain, tidak dipanggil oleh pipeline ml/ yang baru.
 import pandas as pd
 from rdkit import Chem
 import argparse
