@@ -18,3 +18,7 @@ pyyaml>=6.0.1
 matplotlib>=3.9.0
 tqdm>=4.66.4
 pytest>=8.2.2
+httpx>=0.27.0
+
+# hepatwin_ml package (shared by app/services/ai_engine.py at runtime)
+-e ./ml

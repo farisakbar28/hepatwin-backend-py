@@ -120,6 +120,7 @@ opencode.json
 ml/data/raw/
 ml/data/interim/
 ml/models/
+*.egg-info/
 
 # Model weights are ignored by default, except the final artifacts served by app/
 *.pt

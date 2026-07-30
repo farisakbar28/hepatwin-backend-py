@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "HepaTwin Backend API"
     API_V1_STR: str = "/api/v1"
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:3000"]
-    AI_MODEL_PATH: str = "models/model.pt"
+    AI_MODEL_DIR: str = "app/models"
     DEBUG: bool = False
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

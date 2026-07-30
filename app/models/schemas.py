@@ -43,3 +43,11 @@ class SimulationResponse(BaseModel):
     visual_pattern: str = Field(..., description="Pola visual 3D.")
     time_series_pkpd: Optional[List[Dict[str, Any]]] = Field(None, description="Data plot grafik NAPQI/GSH.")
     nomogram_data: Optional[List[Dict[str, Any]]] = Field(None, description="Data plot klinis Rumack-Matthew.")
+    model_version: str = Field(..., description="Versi model AI yang menghasilkan skor (mis. gatnn-dnn-arm-a-v1).")
+    model_status: Literal["ready", "unavailable"] = Field(..., description="Status kesiapan model AI saat request diproses.")
+    score_is_calibrated: bool = Field(..., description="Apakah DILI_score sudah melalui kalibrasi probabilitas (TU.10).")
+    internal_cv_auc: Optional[float] = Field(
+        None,
+        description="AUC-ROC validasi silang internal (5-fold, tanpa external test - UPSCALE.md SS1.2/SS4). "
+        "Menggantikan field external_auc versi lama karena tidak ada lagi external test.",
+    )

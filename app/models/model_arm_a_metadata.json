@@ -1,0 +1,15 @@
+{
+  "model_version": "gatnn-dnn-arm-a-v1",
+  "arm": "A",
+  "architecture": "GATNN-DNN (GATv2Conv x2 + DNN, Wibowo et al. 2025)",
+  "training_seed": 42,
+  "n_train": 671,
+  "n_cal": 168,
+  "calibrator_method": "platt",
+  "internal_cv_auc_l1_random": 0.7385,
+  "internal_cv_auc_l1_std": 0.0291,
+  "internal_cv_auc_l2_scaffold": 0.7336,
+  "internal_cv_auc_l2_std": 0.0382,
+  "internal_cv_source": "ml/reports/09_arm_a_random_l1.json, ml/reports/09_arm_a_scaffold_l2.json (5 seed x 5 fold)",
+  "note": "AUC di atas dari cross-validation TU.9 (bukan dari split train/cal script ini), representasi performa yang lebih robust."
+}
