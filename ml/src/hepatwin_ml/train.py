@@ -128,10 +128,26 @@ def run_arm(
 
     split_fn = random_kfold if split_type == "random" else scaffold_kfold
 
-    all_metrics = []
+    out_json_path = Path(out_json)
+    all_metrics: list[dict] = []
+    done: set[tuple[int, int]] = set()
+    if out_json_path.exists():
+        prior = json.loads(out_json_path.read_text(encoding="utf-8"))
+        all_metrics = prior.get("per_run", [])
+        done = {(m["seed"], m["fold"]) for m in all_metrics}
+        logger.info("Resume: %d run sudah ada di %s, dilewati", len(done), out_json)
+
+    def _write_partial() -> None:
+        summary = summarize_across_seeds(all_metrics) if all_metrics else {}
+        result = {"split_type": split_type, "n_total": len(df), "per_run": all_metrics, "summary": summary}
+        out_json_path.parent.mkdir(parents=True, exist_ok=True)
+        out_json_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+
     t0 = time.time()
     for seed in seeds:
         for fold_i, (train_idx, val_idx) in enumerate(split_fn(df, k=k, seed=seed)):
+            if (seed, fold_i) in done:
+                continue
             train_df = df.iloc[train_idx].reset_index(drop=True)
             val_df = df.iloc[val_idx].reset_index(drop=True)
             train_graphs = build_graph_dataset(train_df)
@@ -142,16 +158,13 @@ def run_arm(
             metrics["seed"] = seed
             metrics["fold"] = fold_i
             all_metrics.append(metrics)
+            _write_partial()  # tulis progres tiap fold -- jangan hilang bila proses terputus
             logger.info(
                 "seed=%d fold=%d auc=%.4f mcc=%.4f (n_train=%d n_val=%d) [%.1fs elapsed]",
                 seed, fold_i, metrics["auc_roc"], metrics["mcc"], len(train_idx), len(val_idx), time.time() - t0,
             )
 
     summary = summarize_across_seeds(all_metrics)
-
-    result = {"split_type": split_type, "n_total": len(df), "per_run": all_metrics, "summary": summary}
-    Path(out_json).parent.mkdir(parents=True, exist_ok=True)
-    Path(out_json).write_text(json.dumps(result, indent=2), encoding="utf-8")
 
     lines = [
         f"# Evaluasi GATNN-DNN -- split={split_type}",
@@ -167,7 +180,7 @@ def run_arm(
         lines.append(f"| {key} | {mean:.4f} | {std:.4f} |")
     Path(out_md).write_text("\n".join(lines), encoding="utf-8")
     logger.info("Selesai split=%s dalam %.1f menit -> %s", split_type, (time.time() - t0) / 60, out_json)
-    return result
+    return {"split_type": split_type, "n_total": len(df), "per_run": all_metrics, "summary": summary}
 
 
 def main() -> None:
