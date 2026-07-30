@@ -385,21 +385,27 @@ Field `model_version`, `model_status`, `score_is_calibrated` tetap wajib. `exter
 
 ## 11. Definition of Done (revisi)
 
-- [ ] Branch `upscale` ada, dibuat dari `master`, `master` tidak berubah
-- [ ] `ml/data/processed/arm_a.parquet` — DILIrank 2.0 saja
-- [ ] `ml/data/processed/arm_b.parquet` — DILIrank 2.0 + LiverTox, `source_dataset` per baris, tingkat konflik label terhitung
-- [ ] Master List LiverTox terunduh, skema A/B-vs-E/E* diterapkan sesuai §3.3
-- [ ] `ml/src/hepatwin_ml/models/gatnn_dnn.py` memakai GATConv/GATv2Conv, mengembalikan logit
-- [ ] `ml/models/model_arm_a.pt` dan `model_arm_b.pt` ada dan bukan bobot acak
-- [ ] Kalibrator tersimpan untuk kedua arm, ECE & Brier dilaporkan
-- [ ] `ml/reports/comparison.md` — Arm A vs Arm B × L1/L2 × 5 seed (mean ± std)
-- [ ] Baseline RF & MLP di tabel yang sama
-- [ ] `scripts/export_to_app.py` dijalankan — artefak model & kalibrator terpilih tersalin ke `app/models/`
-- [ ] `app/services/ai_engine.py` memuat artefak dari `app/models/` dan menjalankan inferensi dengan model asli (bukan bobot acak)
-- [ ] Endpoint balas 503 saat model tidak ada
-- [ ] Latensi Mode Triase < 5 detik
-- [ ] Daftar SMARTS ditandatangani Farmasi
-- [ ] `ml/reports/limitations.md` memuat: dataset kecil, tidak ada external test dan alasannya (mengikuti Wibowo), Tox21/FAERS sebagai stretch belum tentu selesai
+**Status per 2026-07-31 (branch `upscale`, commit terakhir TU.14/TU.15).**
+
+- [x] Branch `upscale` ada, dibuat dari `master`, `master` tidak berubah (`git diff master upscale -- app/` kosong sampai TU.14)
+- [x] `ml/data/processed/arm_a.parquet` — DILIrank 2.0 saja (839 senyawa)
+- [x] `ml/data/processed/arm_b.parquet` — DILIrank 2.0 + LiverTox, `source_dataset` per baris, tingkat konflik label terhitung (1253 senyawa, konflik 18,6%, teraudit)
+- [x] Master List LiverTox terunduh, skema A/B-vs-E/E* diterapkan sesuai §3.3
+- [x] `ml/src/hepatwin_ml/models/gatnn_dnn.py` memakai GATv2Conv, mengembalikan logit
+- [x] `ml/models/model_arm_a.pt` ada dan bukan bobot acak — [ ] `model_arm_b.pt` **sengaja tidak diekspor sebagai artefak produksi**: TU.13 menemukan Arm B signifikan lebih buruk dari Arm A (p<0,0001, `07_comparison.md`), dikonfirmasi user untuk TIDAK dipakai produksi. Arm B tetap terevaluasi penuh (5 seed × L1/L2) untuk transparansi, hanya tidak diekspor sebagai model final.
+- [x] Kalibrator tersimpan untuk Arm A, ECE & Brier dilaporkan (`10_calibration.md`) — kalibrator Arm B tidak dibuat (konsisten dengan keputusan di atas)
+- [x] `ml/reports/07_comparison.md` — Arm A vs Arm B × L1/L2 × 5 seed (mean ± std)
+- [x] Baseline RF & MLP di tabel yang sama
+- [x] `ml/scripts/export_to_app.py` dijalankan — artefak model & kalibrator Arm A tersalin ke `app/models/`
+- [x] `app/services/ai_engine.py` memuat artefak dari `app/models/` dan menjalankan inferensi dengan model asli (bukan bobot acak)
+- [x] Endpoint balas 503 saat model tidak ada (diverifikasi manual + test otomatis `tests/test_simulation_api.py`)
+- [x] Latensi Mode Triase < 5 detik (diverifikasi: p95 = 0,98 detik)
+- [ ] Daftar SMARTS ditandatangani Farmasi — **belum**, status `[KEPUTUSAN AI — PENDING REVIEW FARMASI]` di seluruh laporan terkait (gerbang B5, EXECUTION_PLAN_UPSCALE.md §14.1)
+- [x] `ml/reports/limitations.md` memuat: dataset kecil, tidak ada external test dan alasannya (mengikuti Wibowo), Tox21/FAERS sebagai stretch belum dikerjakan (batasan waktu, bukan disembunyikan)
+
+**Belum selesai (di luar cakupan siklus kerja ini, dicatat jujur bukan disembunyikan):**
+- Validasi Farmasi untuk gerbang B2/B3/B4/B5 (lihat EXECUTION_PLAN_UPSCALE.md §14.1) — prasyarat sebelum rilis produksi sungguhan
+- TU.16 (Tox21 multi-task) dan TU.17 (FAERS signal) — stretch goal, tidak dikerjakan, tidak memblokir DoD di atas
 
 ---
 
