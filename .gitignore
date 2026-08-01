@@ -125,6 +125,9 @@ ml/models/
 # TU.18 (v3.0): holdout seal is a tamper-evident audit artifact, not a reproducible
 # intermediate - must be committed so git history proves the holdout wasn't touched
 !ml/data/interim/holdout_inchikeys.json
+# TU.20 (v3.0): outer fold indices must be reused identically by all 5 models -
+# committing this is what proves the paired significance tests in TU.21 are valid
+!ml/data/interim/outer_fold_indices.json
 
 # Model weights are ignored by default, except the final artifacts served by app/
 *.pt
