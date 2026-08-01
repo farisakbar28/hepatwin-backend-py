@@ -118,9 +118,13 @@ opencode.json
 # ==========================================
 # ml/ pipeline: raw/interim data & intermediate models are reproducible, not committed
 ml/data/raw/
-ml/data/interim/
+ml/data/interim/*
 ml/models/
 *.egg-info/
+
+# TU.18 (v3.0): holdout seal is a tamper-evident audit artifact, not a reproducible
+# intermediate - must be committed so git history proves the holdout wasn't touched
+!ml/data/interim/holdout_inchikeys.json
 
 # Model weights are ignored by default, except the final artifacts served by app/
 *.pt

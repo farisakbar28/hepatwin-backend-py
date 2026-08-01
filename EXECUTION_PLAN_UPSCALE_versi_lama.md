@@ -3,21 +3,8 @@
 **Proyek:** HepaTwin — Mesin B (AI/ML) Upscale
 **Repo:** `hepatwin-backend-py` (repo yang sudah ada — **bukan** repo baru)
 **Branch:** `upscale`, dibuat dari `master`. Seluruh task di bawah ini adalah commit di branch `upscale`. `master` tidak disentuh.
-**Dokumen induk:** `UPSCALE.md` v3.0 — baca lebih dulu
-**Versi:** 3.0 — revisi protokol validasi mengikuti `Panduan_Training_GATNN-DNN_vs_Konvensional.md` (ketua tim). K3 dibalik: external hold-out kini wajib. TU.18–TU.22 baru.
-
----
-
-## Ringkasan Perubahan dari v2.1 → v3.0
-
-| Bagian | Perubahan |
-|---|---|
-| TU.18 *(baru)* | Bangun `holdout_set` scaffold-disjoint 15–20% — **wajib dikerjakan sebelum TU.19–22** |
-| TU.19 *(baru)* | Tambah baseline LightGBM, XGBoost, Logistic Regression + `class_weight`/`scale_pos_weight` |
-| TU.20 *(baru)* | Nested CV (outer 10-fold scaffold + inner 3-fold hyperparameter search, budget identik lintas model) |
-| TU.21 *(baru)* | Uji statistik: Wilcoxon signed-rank berpasangan, DeLong pada hold-out, bootstrap CI, Y-randomization |
-| TU.22 *(baru)* | Evaluasi akhir hold-out (sekali jalan) + tabel laporan format panduan ketua tim |
-| TU.9/TU.13 (lama) | **Tidak diulang/dihapus** — hasilnya dipertahankan sebagai "Tahap 1 — CV internal", dilaporkan berdampingan dengan Tahap 2 (TU.18–22), lihat UPSCALE.md §4 & §13 |
+**Dokumen induk:** `UPSCALE.md` v2.1 — baca lebih dulu
+**Versi:** 2.1 — revisi struktur kerja: branch baru di repo yang sudah ada, bukan repo terpisah
 
 ---
 
@@ -78,13 +65,8 @@
 | TU.15 | Laporan akhir & limitations | — | 3 jam |
 | TU.16 | *(stretch)* Tox21 multi-task auxiliary head | — | 4–6 jam |
 | TU.17 | *(stretch)* FAERS disproportionality signal | — | 4–6 jam |
-| **TU.18** | 🔴 Bangun external hold-out set (15–20%, scaffold-disjoint) | — (prasyarat TU.19–22) | 2–3 jam |
-| **TU.19** | Perluas baseline: LightGBM, XGBoost, Logistic Regression + class weighting | — | 3–4 jam |
-| **TU.20** | Nested CV (outer 10-fold + inner 3-fold hyperparameter search) | tunggu TU.18, TU.19 | 6–10+ jam (tergantung compute) |
-| **TU.21** | Uji statistik: Wilcoxon, DeLong (disiapkan), bootstrap CI (disiapkan), Y-randomization | tunggu TU.20 | 3–4 jam |
-| **TU.22** | Evaluasi akhir hold-out (sekali jalan) + laporan final | tunggu TU.21 lolos | 3–4 jam |
 
-**Jalur tidak terblokir yang bisa langsung dikerjakan:** TU.0 → TU.1 → TU.2 → TU.4 → TU.5 → TU.7 → TU.8 → TU.12 (Arm B, tidak menunggu keputusan manusia) → **TU.18 → TU.19 → TU.20 → TU.21 → TU.22** (jalur v3.0, berurutan ketat, TU.18 wajib paling dulu di antara kelimanya). Gerbang manusia hanya menggigit di TU.3, TU.6 (sebagian), dan TU.11 — TU.18–22 sendiri tidak menunggu Farmasi, murni menunggu urutan teknis satu sama lain.
+**Jalur tidak terblokir yang bisa langsung dikerjakan:** TU.0 → TU.1 → TU.2 → TU.4 → TU.5 → TU.7 → TU.8 → **TU.12** (Arm B sekarang juga bisa langsung jalan, tidak menunggu keputusan manusia). Gerbang manusia hanya menggigit di TU.3, TU.6 (sebagian), dan TU.11.
 
 ---
 
@@ -277,113 +259,6 @@ Ikuti spesifikasi v2.0 apa adanya (path sudah diberi prefix `ml/` di atas), deng
 - [ ] `ml/reports/09_faers_feature_ablation.md`
 - [ ] Daftar istilah MedDRA yang dipakai dicatat eksplisit dan ditandai `# PENDING pharmacy review`
 - [ ] Jelas dilabeli sebagai eksperimen fitur tambahan, bukan Arm C baru
-
----
-
-## TU.18 — 🔴 Bangun External Hold-out Set (WAJIB, prasyarat TU.19–22)
-
-**Dasar:** `UPSCALE.md` §13.1. Ini task **pertama** dari revisi v3.0 — TU.19–22 semuanya bergantung pada `holdout_set` yang dihasilkan di sini, jadi urutannya tidak boleh dibalik.
-
-**File:** `ml/src/hepatwin_ml/data/holdout.py` (baru)
-
-**Langkah:**
-1. Muat `ml/data/processed/arm_a.parquet` (839 senyawa, hasil TU.4 — **tidak diubah**, cuma dibaca).
-2. Kelompokkan berdasarkan scaffold Bemis-Murcko (pakai ulang `_bemis_murcko_scaffold()` dari `splits.py`).
-3. Acak urutan **kelompok scaffold** (bukan senyawa individual) dengan seed tetap (`seed=42`, dicatat eksplisit supaya reproducible).
-4. Ambil kelompok scaffold berurutan sampai total senyawa mencapai **15–20%** dari 839 (target: 126–168 senyawa) → `holdout_set`.
-5. Cek proporsi label di `holdout_set` vs keseluruhan — laporkan selisihnya, tidak perlu dipaksa sama persis (scaffold-disjoint lebih diutamakan, sesuai `UPSCALE.md` §13.1 poin 6).
-6. Sisanya → `dev_pool` (≈ 671–712 senyawa).
-7. Simpan **keduanya sebagai file terpisah**: `ml/data/processed/arm_a_holdout.parquet`, `ml/data/processed/arm_a_devpool.parquet`. Simpan juga daftar `LTKBID`/`inchikey` yang masuk hold-out ke `ml/data/interim/holdout_inchikeys.json` — ini jadi "segel" yang dicek ulang di TU.22 untuk membuktikan hold-out benar-benar tidak disentuh sebelumnya.
-8. **Verifikasi otomatis (wajib, bukan opsional):** tulis test yang assert **tidak ada satu scaffold pun** yang muncul di kedua file.
-
-**Acceptance criteria:**
-- [ ] `pytest ml/tests/test_holdout.py` hijau — assert scaffold-disjoint 100%, assert ukuran hold-out 15–20%
-- [ ] `ml/reports/18_holdout_construction.md` — ukuran, proporsi label, daftar scaffold representatif di tiap sisi
-- [ ] Arm B (opsional, sekunder) boleh diberi perlakuan sama bila waktu memungkinkan — bukan blocker untuk TU.19–22 yang fokus Arm A
-
-🚩 **Setelah task ini selesai, `arm_a_holdout.parquet` TIDAK BOLEH dibaca lagi oleh kode apa pun sampai TU.22.** Godaan paling umum di sini adalah "intip dulu performanya" — itu justru yang bikin hold-out kehilangan fungsinya.
-
----
-
-## TU.19 — Perluas Baseline: LightGBM, XGBoost, Logistic Regression
-
-**Dasar:** `UPSCALE.md` §13.2, K7.
-
-**File:** revisi `ml/src/hepatwin_ml/models/baselines.py`
-
-**Langkah:**
-1. Tambahkan `make_lightgbm(seed)`, `make_xgboost(seed)`, `make_logistic_regression(seed)`, memakai fitur yang **sama persis** dengan RF (`ecfp4_features`) — bukan fitur baru, supaya perbandingan adil (`UPSCALE.md` §3, prinsip panduan ketua tim).
-2. **Revisi `make_random_forest()`**: tambahkan `class_weight="balanced"` (saat ini tidak diset — ini gap nyata, bukan asumsi).
-3. LightGBM & XGBoost: gunakan `scale_pos_weight = n_negatif/n_positif` dihitung dari **train fold saja** (bukan keseluruhan data — itu leakage).
-4. Logistic Regression: `class_weight="balanced"`, `max_iter=1000` (default sklearn sering tidak konvergen pada data ber-dimensi tinggi seperti ECFP4).
-5. Tambahkan ke `ml/requirements.txt`: `lightgbm>=4.0`, `xgboost>=2.0`.
-
-**Acceptance criteria:**
-- [ ] `pytest ml/tests/test_baselines.py` hijau untuk kelima model (RF, MLP, LightGBM, XGBoost, LogReg)
-- [ ] Fit-predict cepat pada subset kecil (10 baris) tidak error — sanity check sebelum dipakai di nested CV (TU.20) yang lebih mahal
-
----
-
-## TU.20 — Nested Cross-Validation (Hyperparameter Tuning Adil)
-
-**Dasar:** `UPSCALE.md` §13.3.
-
-**File:** `ml/src/hepatwin_ml/nested_cv.py` (baru)
-
-**Langkah:**
-1. Muat `arm_a_devpool.parquet` (**bukan** file penuh — hold-out tidak boleh masuk sini sama sekali).
-2. Outer loop: **10-fold** scaffold-stratified CV pada `dev_pool` (pakai `scaffold_kfold` dari `splits.py`, `k=10`).
-3. Untuk tiap fold outer, pada 9 fold training-nya: inner loop 3-fold CV untuk hyperparameter search, ruang pencarian persis tabel `UPSCALE.md` §13.3, **budget 10 trial random search untuk SEMUA model** (GATNN-DNN dan 4 baseline dari TU.19) — pakai `sklearn.model_selection.RandomizedSearchCV` untuk baseline, loop manual dengan budget sama untuk GATNN-DNN (karena PyTorch tidak langsung kompatibel dengan `RandomizedSearchCV`).
-4. Ambil hyperparameter terbaik (berdasar AUC rata-rata inner 3-fold), latih ulang pada 9 fold training penuh, evaluasi pada 1 fold outer yang belum pernah dilihat proses tuning.
-5. **Simpan indeks fold outer ke file** (`ml/data/interim/outer_fold_indices.json`) — dipakai ulang **identik** untuk kelima model, ini prasyarat validitas uji berpasangan di TU.21.
-6. Simpan skor AUC (dan metrik lain dari `evaluate.py`) per model per fold outer ke `ml/reports/20_nested_cv_scores.json`.
-
-**Acceptance criteria:**
-- [ ] Fold outer index file ada dan dipakai ulang persis oleh kelima model (dibuktikan lewat hash/checksum fold assignment yang sama)
-- [ ] `ml/reports/20_nested_cv_scores.md` — tabel AUC per model, 10 fold outer, mean±std
-- [ ] Waktu eksekusi dicatat — bila nested CV GATNN-DNN terlalu lama (>beberapa jam di CPU), laporkan dan diskusikan pemangkasan budget, jangan diam-diam dikurangi tanpa dicatat
-
----
-
-## TU.21 — Uji Signifikansi Statistik
-
-**Dasar:** `UPSCALE.md` §13.4.
-
-**File:** `ml/src/hepatwin_ml/significance.py` (baru)
-
-**Langkah:**
-1. **Wilcoxon signed-rank**: untuk tiap baseline (RF, LightGBM, XGBoost, LogReg), bandingkan array AUC 10-fold outer (dari TU.20) dengan array AUC GATNN-DNN pada fold yang **sama persis** (`scipy.stats.wilcoxon`). 4 uji, 4 p-value.
-2. **DeLong test**: pada `holdout_set` — tapi **belum dijalankan di sini**, cuma disiapkan fungsinya (`delong_test(y_true, proba_model_a, proba_model_b)`), dieksekusi di TU.22 (hold-out baru boleh disentuh di TU.22, bukan TU.21).
-3. **Bootstrap CI**: fungsi `bootstrap_auc_ci(y_true, y_prob, n_resample=1000)`, disiapkan sama, dieksekusi TU.22.
-4. **Y-randomization**: acak `label_binary` pada `dev_pool` (bukan hold-out), latih ulang GATNN-DNN dengan hyperparameter terbaik dari TU.20, evaluasi pada **fold outer dev_pool** (bukan hold-out — ini sanity check di ranah dev_pool dulu; ulangi versi hold-out di TU.22 bila waktu memungkinkan). AUC hasil harus mendekati 0,5.
-
-**Acceptance criteria:**
-- [ ] `pytest ml/tests/test_significance.py` hijau (test pada data sintetik dengan hasil yang diketahui, sebelum dipakai ke data asli)
-- [ ] `ml/reports/21_significance_devpool.md` — 4 p-value Wilcoxon, hasil Y-randomization
-- [ ] 🚩 Bila AUC Y-randomization jauh di atas 0,5 (mis. >0,6) → **berhenti, audit dulu** sebelum lanjut TU.22, ikuti `UPSCALE.md` §13.7
-
----
-
-## TU.22 — Evaluasi Akhir Hold-out (Sekali Jalan) + Laporan Final
-
-**Dasar:** `UPSCALE.md` §13.5, §13.6.
-
-**File:** `ml/scripts/run_final_holdout_eval.py` (baru)
-
-**Langkah:**
-1. Verifikasi TU.21 sudah lolos (Y-randomization wajar) sebelum mulai — kalau belum, **stop**.
-2. Latih ulang kelima model (GATNN-DNN + RF + LightGBM + XGBoost + LogReg) pada **seluruh `dev_pool`** memakai hyperparameter terbaik hasil TU.20.
-3. Evaluasi **satu kali** pada `arm_a_holdout.parquet`. Jalankan `delong_test()` dan `bootstrap_auc_ci()` (disiapkan TU.21) di sini.
-4. **Segera setelah langkah 3, tandai `holdout_set` sebagai "sudah dipakai"** — commit message eksplisit menyatakan ini, supaya siapa pun yang membaca histori git tahu titik ini adalah evaluasi final, bukan salah satu dari banyak percobaan.
-5. Susun `ml/reports/14_final_comparison.md` sesuai format tabel `UPSCALE.md` §13.6, termasuk baris GATNN-DNN Arm B (pakai ulang hasil `13_arm_b_*` yang sudah ada, tidak perlu re-run) sebagai baris ablasi LiverTox.
-6. Update `ml/reports/limitations.md`: tambahkan catatan bahwa Tahap 2 (hold-out asli) sekarang jadi angka utama laporan, Tahap 1 (CV internal) tetap dilaporkan sebagai konteks historis — dan **perbaiki juga** catatan lama soal TU.16 (lihat catatan kejujuran sebelumnya: `08_tox21_ablation.md` sudah selesai, tapi versi lama `limitations.md` sempat ditulis sebelum itu — pastikan versi final konsisten).
-
-**Acceptance criteria:**
-- [ ] `ml/reports/14_final_comparison.md` — tabel lengkap terisi angka nyata, bukan placeholder
-- [ ] `holdout_set` terbukti hanya dipakai sekali (commit history menunjukkan satu titik evaluasi, bukan berulang)
-- [ ] p-value DeLong + bootstrap CI tercantum untuk kelima model
-- [ ] Kesimpulan eksplisit: model mana yang direkomendasikan produksi, dengan bukti statistik (bukan cuma "AUC lebih tinggi")
-- [ ] Bila hasil Tahap 2 berbeda dari Tahap 1 (mis. GATNN tidak lagi kompetitif, atau sebaliknya jadi lebih unggul) — dilaporkan apa adanya, dijelaskan kemungkinan sebabnya (ukuran data lebih kecil di dev_pool vs seluruh Arm A, dst.)
 
 ---
 
