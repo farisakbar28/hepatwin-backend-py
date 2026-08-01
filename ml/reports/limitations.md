@@ -1,8 +1,38 @@
 # Limitations & Batasan -- HepaTwin Mesin B (branch upscale)
 
-Disusun sebagai bagian TU.15, merangkum seluruh temuan TU.0-TU.14. Prinsip
-penulisan dokumen ini: jujur apa adanya (Aturan Main #4/#5), tidak menyembunyikan
-kelemahan demi presentasi yang lebih baik.
+Disusun TU.15, **diperbarui TU.22 (v3.0)** untuk merangkum seluruh temuan
+TU.0-TU.22 termasuk revisi protokol validasi dari Ketua Tim
+(`Panduan Training GATNN-DNN vs Konvensional.md`). Prinsip penulisan dokumen
+ini: jujur apa adanya (Aturan Main #4/#5), tidak menyembunyikan kelemahan
+demi presentasi yang lebih baik.
+
+## 0. v3.0: Tahap 2 (nested CV + hold-out asli) sekarang jadi angka utama
+
+K3 (tanpa external test) **dibalik** di v3.0 -- lihat UPSCALE.md §1.4. Angka
+yang sekarang dianggap paling kredibel untuk laporan akhir adalah
+`ml/reports/14_final_comparison.md` (evaluasi SATU KALI pada 167 senyawa
+hold-out yang scaffold-disjoint dan tidak pernah disentuh proses tuning).
+Angka Tahap 1 (CV internal seluruh data, `09c_arm_a_comparison.md`,
+`07_comparison.md`) **tetap dipertahankan di laporan**, bukan dihapus --
+diperlakukan sebagai konteks historis/proses, bukan lagi klaim performa utama.
+AUC Tahap 2 (~0,64-0,69) lebih rendah dari Tahap 1 (~0,74-0,75) -- ini
+**diprediksi dan diharapkan** (UPSCALE.md §13.7), bukan tanda kegagalan;
+CV berulang di data yang sama secara wajar sedikit optimis dibanding ujian
+pada data yang benar-benar belum pernah dilihat.
+
+## 0.1 Insiden integritas ditemukan & diperbaiki selama persiapan TU.22
+
+Saat menyiapkan hyperparameter final untuk TU.22, ditemukan bug: hyperparameter
+GATNN-DNN yang di-*sample* di nested CV (TU.20) TIDAK PERNAH benar-benar
+dikirim ke `train_gatnn()`/`GatnnDnn` -- keduanya memakai nilai hardcode,
+membuat seluruh pencarian hyperparameter GATNN-DNN jadi no-op (baseline lain
+tidak terpengaruh, sudah benar dari awal). Ini melanggar K9 (budget tuning
+harus adil untuk semua model). **Diperbaiki** (kode + re-run penuh 10 fold
+outer, ~70 menit), didokumentasikan lengkap di commit `fix(critical)` dan
+`fix: perbarui TU.20/TU.21`. Angka final di dokumen ini SUDAH memakai hasil
+yang terkoreksi. Kesimpulan utama (GATNN-DNN vs RF setara secara statistik)
+**tidak berubah** setelah koreksi, tapi angka presisnya berubah -- keduanya
+tetap dilaporkan demi transparansi proses, bukan cuma hasil akhirnya.
 
 ## 1. Tanpa external test dari studi independen -- keputusan sadar, bukan kelalaian
 
@@ -92,23 +122,45 @@ Done (UPSCALE.md §11) tetap mensyaratkan tanda tangan Farmasi sebelum rilis
 produksi sungguhan. Bukti konkret baru dari TU.12 (§3 di atas) memperkuat,
 bukan melemahkan, urgensi review B2 secara khusus.
 
-## 8. Tox21 (TU.16) dan FAERS (TU.17): TIDAK dikerjakan -- batasan waktu
+## 8. Status stretch goal: TU.16 selesai (hasil netral), TU.17 ditunda
 
-Kedua stretch goal ini **tidak dikerjakan** dalam siklus kerja TU.0-TU.15.
-Ini dinyatakan eksplisit sebagai **batasan waktu**, bukan disembunyikan atau
-diklaim selesai. Keduanya secara eksplisit tidak memblokir Definition of Done
-(UPSCALE.md §11 tidak mensyaratkan TU.16/17 selesai) dan tetap "menggunakan"
-FAERS/Tox21 sesuai arahan awal tetap dianggap tidak terpenuhi untuk siklus
-ini -- perlu dijadwalkan terpisah bila waktu kompetisi memungkinkan.
+**TU.16 (Tox21 multi-task auxiliary head): SUDAH dikerjakan dan selesai**
+(lihat `08_tox21_ablation.md`) -- auxiliary head Tox21 terbukti **tidak
+memberi manfaat signifikan** untuk AUC DILI (selisih dalam 1 std, MCC malah
+sedikit turun). Dilaporkan apa adanya sebagai hasil netral, bukan dipoles.
 
-## 9. DeLong test diganti Mann-Whitney U (penyimpangan metodologis, dijelaskan)
+**TU.17 (FAERS disproportionality signal): DITUNDA atas permintaan pemilik
+repo** -- bukan batasan waktu murni, tapi keputusan sadar menunggu API key
+openFDA resmi dari Ketua Tim (supaya bisa cover seluruh 1.253 obat Arm B
+tanpa risiko kena limit harian API anonim). Kode & rencana implementasi sudah
+disiapkan (lihat riwayat percakapan), tinggal dieksekusi begitu API key
+tersedia. Tidak memblokir Definition of Done manapun.
 
-UPSCALE.md §4.4/TU.13 meminta DeLong test, yang secara baku butuh 2 model
-dibandingkan pada **sampel test yang identik**. Arm A dan Arm B punya sampel
-senyawa yang berbeda, membuat DeLong tidak applicable secara statistik.
-Mann-Whitney U dipakai sebagai gantinya (lihat `07_comparison.md`), valid
-untuk 2 sampel independen -- penyimpangan ini didokumentasikan eksplisit,
-bukan diam-diam diganti tanpa penjelasan.
+## 9. DeLong test: valid & dipakai di TU.22, Mann-Whitney U tetap untuk Arm A vs Arm B
+
+UPSCALE.md §4.4/TU.13 (Tahap 1) meminta DeLong test untuk Arm A vs Arm B --
+tapi keduanya punya **sampel senyawa berbeda** (bukan model dibandingkan pada
+test set yang sama), jadi DeLong secara statistik tidak applicable di sana.
+**Mann-Whitney U** dipakai untuk kasus itu (lihat `07_comparison.md`), valid
+untuk 2 sampel independen -- penyimpangan ini didokumentasikan eksplisit.
+
+Di v3.0 (TU.22), DeLong test **benar-benar dipakai dan valid**: kelima model
+(GATNN-DNN + 4 baseline) dievaluasi pada `holdout_set` yang **sama persis**,
+jadi DeLong applicable sebagaimana mestinya (lihat `14_final_comparison.md`).
+
+## 10.1 Kesimpulan akhir GNN vs tabular (TU.22, hold-out asli)
+
+Pada `holdout_set` (167 senyawa, tidak pernah dilihat proses tuning):
+GATNN-DNN AUC 0,6821, Random Forest 0,6914, LightGBM 0,6905 -- **semua
+selisih dengan GATNN-DNN TIDAK signifikan** (DeLong p>0,46 untuk ketiganya).
+GATNN-DNN cuma signifikan unggul dari Logistic Regression (p=0,0073). Ini
+mengonfirmasi, dengan bukti paling kredibel yang tersedia (uji berpasangan
+pada hold-out asli), kesimpulan yang konsisten di SEMUA tahap pengujian
+sepanjang proyek ini: **GATNN-DNN dan model pohon (RF/LightGBM/XGBoost)
+setara secara statistik** pada dataset sekecil ini (839-672 senyawa) --
+bukan salah satu menang telak, dan CI 95% bootstrap yang lebar (~0,15-0,19)
+di semua model jadi pengingat bahwa ukuran sampel hold-out (167) masih
+kecil untuk klaim performa yang sangat presisi.
 
 ## 10. Environment & reproduksibilitas
 
