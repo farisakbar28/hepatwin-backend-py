@@ -1,0 +1,43 @@
+{
+  "wilcoxon": {
+    "random_forest": {
+      "statistic": 25.0,
+      "p_value": 0.845703125,
+      "mean_diff": -0.000557539574173993
+    },
+    "lightgbm": {
+      "statistic": 0.0,
+      "p_value": 0.001953125,
+      "mean_diff": 0.05881298473034504
+    },
+    "xgboost": {
+      "statistic": 4.0,
+      "p_value": 0.013671875,
+      "mean_diff": 0.0481781037894114
+    },
+    "logistic_regression": {
+      "statistic": 3.0,
+      "p_value": 0.009765625,
+      "mean_diff": 0.04700603707465974
+    }
+  },
+  "y_randomization": {
+    "auc_mean": 0.5508189788977113,
+    "auc_std": 0.08056254997369278,
+    "auc_per_seed": {
+      "42": 0.62,
+      "1": 0.6095238095238095,
+      "2": 0.3998855835240275,
+      "3": 0.5381263616557734,
+      "4": 0.5865591397849463
+    },
+    "fold_used": 0,
+    "hyperparams": {
+      "lr": 0.0005,
+      "hidden": 64,
+      "dropout": 0.4
+    },
+    "n_train": 611,
+    "n_test": 61
+  }
+}
