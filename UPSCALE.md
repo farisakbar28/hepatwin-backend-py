@@ -431,18 +431,24 @@ Field `model_version`, `model_status`, `score_is_calibrated` tetap wajib. `exter
 - Validasi Farmasi untuk gerbang B2/B3/B4/B5 (lihat EXECUTION_PLAN_UPSCALE.md §14.1) — prasyarat sebelum rilis produksi sungguhan
 - TU.16 (Tox21 multi-task) dan TU.17 (FAERS signal) — stretch goal, tidak dikerjakan, tidak memblokir DoD di atas
 
-### 11.1 Definition of Done — v3.0 Tahap 2 (baru, belum dikerjakan per revisi ini)
+### 11.1 Definition of Done — v3.0 Tahap 2 (SELESAI per 2026-08-01)
 
-- [ ] `holdout_set` Arm A dibangun, scaffold-disjoint dari `dev_pool`, 15–20% dari 839 senyawa, terkunci sejak dibuat
-- [ ] `ml/src/hepatwin_ml/models/baselines.py` memuat LightGBM, XGBoost, Logistic Regression (selain RF, MLP), RF direvisi pakai `class_weight='balanced'`
-- [ ] Nested CV (outer 10-fold scaffold, inner 3-fold, budget 10 trial identik lintas model) selesai untuk GATNN-DNN + 4 baseline baru
-- [ ] Fold outer tersimpan sebagai file, dipakai identik untuk seluruh model (prasyarat validitas §13.4)
-- [ ] Wilcoxon signed-rank (GATNN vs tiap baseline) dan DeLong test (pada `holdout_set`) dilaporkan dengan p-value eksplisit
-- [ ] Bootstrap CI (1.000 resample) dilaporkan untuk tiap model di `holdout_set`
-- [ ] Y-randomization dijalankan, AUC hasilnya mendekati 0,5 (bukti tidak ada leakage tersembunyi) — bila tidak, diaudit sebelum lanjut
-- [ ] `holdout_set` hanya dipakai **sekali** untuk evaluasi akhir (dibuktikan lewat log/commit history, bukan cuma diklaim)
-- [ ] `ml/reports/14_final_comparison.md` — tabel format §13.6 lengkap terisi angka nyata
-- [ ] Tahap 1 (CV internal lama) tetap ada di laporan, tidak dihapus, dibandingkan eksplisit dengan Tahap 2
+- [x] `holdout_set` Arm A dibangun, scaffold-disjoint dari `dev_pool`, 15–20% dari 839 senyawa (167, 19,9%), terkunci sejak dibuat (TU.18)
+- [x] `ml/src/hepatwin_ml/models/baselines.py` memuat LightGBM, XGBoost, Logistic Regression (selain RF, MLP), RF direvisi pakai `class_weight='balanced'` (TU.19)
+- [x] Nested CV (outer 10-fold scaffold, inner 3-fold, budget 10 trial identik lintas model) selesai untuk GATNN-DNN + 4 baseline baru (TU.20) — termasuk perbaikan bug tuning GATNN-DNN yang sempat no-op, lihat `limitations.md` §0.1
+- [x] Fold outer tersimpan sebagai file (`ml/data/interim/outer_fold_indices.json`, di-commit), dipakai identik untuk seluruh model
+- [x] Wilcoxon signed-rank (GATNN vs tiap baseline, dev_pool) dan DeLong test (pada `holdout_set`) dilaporkan dengan p-value eksplisit (TU.21, TU.22)
+- [x] Bootstrap CI (1.000 resample) dilaporkan untuk tiap model di `holdout_set` (TU.22)
+- [x] Y-randomization dijalankan (multi-seed setelah audit), AUC mean 0,5547 — dalam rentang noise, tidak ada leakage (TU.21)
+- [x] `holdout_set` hanya dipakai **sekali** untuk evaluasi akhir (commit `TU.22: EVALUASI AKHIR HOLD-OUT`, satu titik evaluasi eksplisit di commit history)
+- [x] `ml/reports/14_final_comparison.md` — tabel format §13.6 lengkap terisi angka nyata
+- [x] Tahap 1 (CV internal lama) tetap ada di laporan, tidak dihapus, dibandingkan eksplisit dengan Tahap 2
+
+**Kesimpulan akhir v3.0:** GATNN-DNN dan Random Forest/LightGBM/XGBoost setara
+secara statistik pada `holdout_set` (DeLong p>0,46 untuk ketiganya) — GATNN-DNN
+cuma signifikan unggul dari Logistic Regression (p=0,0073). Rekomendasi produksi
+tetap GATNN-DNN atas dasar keputusan arsitektur K1, bukan keunggulan AUC yang
+meyakinkan. Lihat `ml/reports/14_final_comparison.md` untuk detail lengkap.
 
 ---
 
