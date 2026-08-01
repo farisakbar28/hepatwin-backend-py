@@ -55,12 +55,18 @@ def train_gatnn(
     max_epochs: int = MAX_EPOCHS,
     patience: int = PATIENCE,
     verbose: bool = False,
+    lr: float = LR,
+    hidden: int = 64,
+    dropout: float = 0.3,
 ) -> tuple[GatnnDnn, np.ndarray, np.ndarray]:
+    """lr/hidden/dropout: dipakai nested_cv.py (TU.20) untuk hyperparameter
+    search -- sebelumnya diam-diam DIABAIKAN di sini (bug ditemukan & diperbaiki
+    saat audit TU.22, lihat 20_nested_cv_scores.md untuk detail)."""
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    model = GatnnDnn()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+    model = GatnnDnn(hidden=hidden, dropout=dropout)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=10)
 
     train_labels = np.array([g.y.item() for g in train_graphs])

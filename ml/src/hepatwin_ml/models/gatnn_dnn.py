@@ -8,6 +8,15 @@ PENTING: model mengembalikan LOGIT, bukan probabilitas (UPSCALE.md SS5.1).
 BCEWithLogitsLoss di training; sigmoid HANYA di lapisan inferensi setelah
 kalibrasi (TU.10). Versi master menaruh nn.Sigmoid() di forward() -- TIDAK
 diwarisi ke sini, itu justru bug yang diperbaiki K1.
+
+TU.20 (v3.0): `hidden` dan `dropout` jadi parameter konstruktor -- UPSCALE.md
+SS13.3 (Panduan_Training...md Ketua Tim) meminta keduanya masuk ruang pencarian
+hyperparameter (hidden in {64,128}, dropout in {0.2,0.3,0.4}). Nilai default
+(64, 0.2/0.3 berbeda per layer) TETAP jadi default parameter -- sama seperti
+UPSCALE.md SS5.1 -- tapi sekarang bisa diubah pemanggil untuk nested CV.
+`dropout` diterapkan seragam ke SEMUA layer dropout di model (GAT + DNN branch
++ head) -- interpretasi paling sederhana dari satu nilai "dropout" di ruang
+pencarian, bukan per-layer terpisah.
 """
 import torch
 import torch.nn as nn
@@ -18,17 +27,25 @@ from torch_geometric.nn import GATv2Conv, global_mean_pool
 from hepatwin_ml.features.fingerprints import FINGERPRINT_DIM
 from hepatwin_ml.features.graph import EDGE_FEATURE_DIM, NODE_FEATURE_DIM
 
-GRAPH_BRANCH_OUT_DIM = 256
+GAT_HEADS = 4
+DEFAULT_HIDDEN = 64
+DEFAULT_DROPOUT = 0.3
 DNN_BRANCH_OUT_DIM = 128
-CONCAT_DIM = GRAPH_BRANCH_OUT_DIM + DNN_BRANCH_OUT_DIM  # 384
 
 
 class GraphBranch(nn.Module):
-    def __init__(self, node_dim: int = NODE_FEATURE_DIM, edge_dim: int = EDGE_FEATURE_DIM):
+    def __init__(
+        self,
+        node_dim: int = NODE_FEATURE_DIM,
+        edge_dim: int = EDGE_FEATURE_DIM,
+        hidden: int = DEFAULT_HIDDEN,
+        dropout: float = DEFAULT_DROPOUT,
+    ):
         super().__init__()
-        self.gat1 = GATv2Conv(node_dim, 64, heads=4, edge_dim=edge_dim, concat=True)
-        self.dropout1 = nn.Dropout(0.2)
-        self.gat2 = GATv2Conv(256, 64, heads=4, edge_dim=edge_dim, concat=True)
+        self.out_dim = hidden * GAT_HEADS
+        self.gat1 = GATv2Conv(node_dim, hidden, heads=GAT_HEADS, edge_dim=edge_dim, concat=True)
+        self.dropout1 = nn.Dropout(dropout)
+        self.gat2 = GATv2Conv(self.out_dim, hidden, heads=GAT_HEADS, edge_dim=edge_dim, concat=True)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         h = self.gat1(x, edge_index, edge_attr=edge_attr)
@@ -36,19 +53,19 @@ class GraphBranch(nn.Module):
         h = self.dropout1(h)
         h = self.gat2(h, edge_index, edge_attr=edge_attr)
         h = F.elu(h)
-        return global_mean_pool(h, batch)  # [batch, 256]
+        return global_mean_pool(h, batch)  # [batch, hidden*GAT_HEADS]
 
 
 class DnnBranch(nn.Module):
-    def __init__(self, in_dim: int = FINGERPRINT_DIM):
+    def __init__(self, in_dim: int = FINGERPRINT_DIM, dropout: float = DEFAULT_DROPOUT):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(in_dim, 512),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(dropout),
             nn.Linear(512, 128),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(dropout),
         )
 
     def forward(self, fingerprint: torch.Tensor) -> torch.Tensor:
@@ -60,14 +77,15 @@ class GatnnDnn(nn.Module):
     sudah punya atribut `fingerprint` [batch, 1200] tertempel per-graph (lihat
     train.py untuk cara menempelkannya saat membangun Data/Batch)."""
 
-    def __init__(self):
+    def __init__(self, hidden: int = DEFAULT_HIDDEN, dropout: float = DEFAULT_DROPOUT):
         super().__init__()
-        self.graph_branch = GraphBranch()
-        self.dnn_branch = DnnBranch()
+        self.graph_branch = GraphBranch(hidden=hidden, dropout=dropout)
+        self.dnn_branch = DnnBranch(dropout=dropout)
+        concat_dim = self.graph_branch.out_dim + DNN_BRANCH_OUT_DIM
         self.head = nn.Sequential(
-            nn.Linear(CONCAT_DIM, 128),
+            nn.Linear(concat_dim, 128),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(dropout),
             nn.Linear(128, 1),
         )
 

@@ -113,6 +113,7 @@ def tune_and_eval_outer_fold(
             val_graphs = build_graph_dataset(train_df.iloc[val_idx].reset_index(drop=True))
             _, val_y, val_probs = train_gatnn(
                 tr_graphs, val_graphs, seed=seed, max_epochs=150, patience=20,
+                lr=params["lr"], hidden=params["hidden"], dropout=params["dropout"],
             )
             aucs.append(roc_auc_score(val_y, val_probs) if len(set(val_y)) > 1 else 0.5)
         score = float(np.mean(aucs))
@@ -121,7 +122,10 @@ def tune_and_eval_outer_fold(
 
     train_graphs_full = build_graph_dataset(train_df)
     test_graphs = build_graph_dataset(test_df)
-    _, test_y_gatnn, test_probs_gatnn = train_gatnn(train_graphs_full, test_graphs, seed=seed, max_epochs=300, patience=30)
+    _, test_y_gatnn, test_probs_gatnn = train_gatnn(
+        train_graphs_full, test_graphs, seed=seed, max_epochs=300, patience=30,
+        lr=best_params["lr"], hidden=best_params["hidden"], dropout=best_params["dropout"],
+    )
     gatnn_metrics = compute_metrics(test_y_gatnn, test_probs_gatnn)
     results["gatnn_dnn"] = {
         "best_params": best_params, "inner_cv_auc": best_score,

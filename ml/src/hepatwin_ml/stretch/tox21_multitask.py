@@ -22,7 +22,7 @@ from torch_geometric.data import Batch, Data
 from torch_geometric.loader import DataLoader
 
 from hepatwin_ml.features.graph import smiles_to_graph
-from hepatwin_ml.models.gatnn_dnn import GRAPH_BRANCH_OUT_DIM, GatnnDnn
+from hepatwin_ml.models.gatnn_dnn import GatnnDnn
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class GatnnDnnWithTox21(GatnnDnn):
 
     def __init__(self):
         super().__init__()
-        self.tox21_head = nn.Linear(GRAPH_BRANCH_OUT_DIM, N_TOX21_TASKS)
+        self.tox21_head = nn.Linear(self.graph_branch.out_dim, N_TOX21_TASKS)
 
     def forward_tox21(self, batch: Batch) -> torch.Tensor:
         graph_repr = self.graph_branch(batch.x, batch.edge_index, batch.edge_attr, batch.batch)
