@@ -25,7 +25,7 @@ class SimulationOrchestrator:
         if not compound:
             raise HTTPException(
                 status_code=404,
-                detail=f"Senyawa dengan hepatwin_id '{request.hepatwin_id}' tidak ditemukan atau tidak simulatable (is_simulatable = FALSE)."
+                detail=f"Senyawa dengan hepatwin_id '{request.hepatwin_id}' tidak ditemukan di database."
             )
 
         smiles = compound.canonical_smiles or compound.isomeric_smiles

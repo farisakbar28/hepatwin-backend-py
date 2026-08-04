@@ -40,10 +40,8 @@ def autocomplete_compounds(
         results = repo.search_by_name(query=q, limit=limit)
         
         if not results:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Senyawa '{q}' tidak ditemukan di database tertutup kami atau berstatus is_simulatable = FALSE."
-            )
+            # Mengembalikan list kosong (200 OK) alih-alih 404
+            results = []
 
         items = [
             CompoundItem(
@@ -98,9 +96,20 @@ def get_compound_detail(
         item = repo.get_compound_by_hepatwin_id(hepatwin_id)
         
         if not item:
+            # Periksa apakah ini adalah senyawa biologik
+            from sqlalchemy import select
+            from app.models.domain import HepatwinCompound
+            stmt = select(HepatwinCompound.is_simulatable).where(HepatwinCompound.hepatwin_id == hepatwin_id)
+            is_sim = db.scalar(stmt)
+            
+            if is_sim is not None and not is_sim:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Senyawa ini bertipe biologik dan tidak dapat disimulasikan."
+                )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Senyawa dengan hepatwin_id '{hepatwin_id}' tidak ditemukan atau tidak tersedia untuk simulasi 3D (is_simulatable = FALSE)."
+                detail=f"Senyawa dengan hepatwin_id '{hepatwin_id}' tidak ditemukan di database."
             )
             
         detail_response = CompoundDetail(

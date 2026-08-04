@@ -4,10 +4,11 @@ from app.core.database import get_db
 from app.models.schemas import SimulationRequest, SimulationResponse
 from app.api.dependencies import get_orchestrator
 from app.services.simulation_orchestrator import SimulationOrchestrator
+from app.core.validators.compound_validator import verify_simulatable_compound
 
 router = APIRouter()
 
-@router.post("/simulate", response_model=SimulationResponse)
+@router.post("/simulate", response_model=SimulationResponse, dependencies=[Depends(verify_simulatable_compound)])
 async def simulate_dili(
     request: SimulationRequest, 
     db: Session = Depends(get_db),

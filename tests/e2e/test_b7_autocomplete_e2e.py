@@ -55,7 +55,10 @@ def test_autocomplete_positive_samples(client: TestClient, query: str):
 def test_autocomplete_negative_wild_samples(client: TestClient, wild_query: str):
     """(2) 10 Sampel Negatif Liar (Anti-Halusinasi / Injeksi Bebas)"""
     response = client.get(f"/api/v1/compounds/autocomplete?q={wild_query}")
-    assert response.status_code in [400, 404] # 400 for SMILES, 404 for empty results
+    if response.status_code == 400:
+        return # SMILES rejection is 400
+    assert response.status_code == 200 # Now returns 200 with empty list
+    assert len(response.json()["results"]) == 0
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("biologic", [
@@ -73,7 +76,8 @@ def test_autocomplete_negative_wild_samples(client: TestClient, wild_query: str)
 def test_autocomplete_biologic_isolation(client: TestClient, biologic: str):
     """(3) 10 Sampel Biologik - Pastikan 0% TAMPIL karena is_simulatable = FALSE"""
     response = client.get(f"/api/v1/compounds/autocomplete?q={biologic}")
-    assert response.status_code == 404 # Karena tidak ketemu/difilter, harus 404
+    assert response.status_code == 200
+    assert len(response.json()["results"]) == 0
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("edge_case", [
@@ -94,7 +98,7 @@ def test_autocomplete_edge_cases(client: TestClient, edge_case: str):
         assert response.status_code == 400
         assert "tidak boleh kosong" in response.json()["detail"].lower()
     else:
-        assert response.status_code in [200, 400, 404]
+        assert response.status_code in [200, 400]
         if response.status_code == 200:
             data = response.json()
             assert "results" in data

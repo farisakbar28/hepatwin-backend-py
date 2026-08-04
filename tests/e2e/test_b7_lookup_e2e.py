@@ -180,8 +180,8 @@ def test_lookup_invalid_id(client: TestClient):
 def test_lookup_biologic_ids_strict_block(client: TestClient, biologic_id: str, biologic_name: str):
     """
     Memverifikasi 10 Senyawa Biologik Nyata di Database (is_simulatable = FALSE).
-    Sistem WAJIB menolak direct lookup dengan HTTP 404 (Not Found / Blocked).
+    Sistem WAJIB menolak direct lookup dengan HTTP 422 (Unprocessable Entity).
     """
     response = client.get(f"/api/v1/compounds/{biologic_id}")
-    assert response.status_code == 404, f"Senyawa biologik {biologic_name} ({biologic_id}) tidak diblokir!"
-    assert "tidak ditemukan" in response.json()["detail"].lower() or "is_simulatable = false" in response.json()["detail"].lower()
+    assert response.status_code == 422, f"Senyawa biologik {biologic_name} ({biologic_id}) tidak diblokir dengan 422!"
+    assert "senyawa ini bertipe biologik" in response.json()["detail"].lower()
