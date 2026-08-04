@@ -11,3 +11,4 @@ torch-geometric>=2.5.3
 scipy>=1.13.1
 numpy>=1.26.4
 shap>=0.45.1
+cachetools>=5.3.3

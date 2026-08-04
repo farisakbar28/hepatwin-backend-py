@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response, Request
+import hashlib
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from app.core.database import get_db
@@ -14,7 +15,9 @@ router = APIRouter()
 def autocomplete_compounds(
     q: str = Query(..., min_length=1, description="Kata kunci nama obat/senyawa INN"),
     limit: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None,
+    response: Response = None
 ):
     if not q or not q.strip():
         raise HTTPException(
@@ -35,6 +38,18 @@ def autocomplete_compounds(
             )
             for item in results
         ]
+        
+        # Implementasi ETag
+        etag_string = f"{q}_{limit}_{len(items)}"
+        etag_hash = f'"{hashlib.md5(etag_string.encode("utf-8")).hexdigest()}"'
+        
+        if request and request.headers.get("if-none-match") == etag_hash:
+            return Response(status_code=304)
+            
+        if response:
+            response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
+            response.headers["ETag"] = etag_hash
+            
         return AutocompleteResponse(query=q, total=len(items), results=items)
     except OperationalError as e:
         logger.error(f"Database OperationalError saat autocomplete: {e}")
@@ -52,7 +67,9 @@ def autocomplete_compounds(
 @router.get("/compounds/{hepatwin_id}", response_model=CompoundDetail)
 def get_compound_detail(
     hepatwin_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None,
+    response: Response = None
 ):
     if not hepatwin_id or not hepatwin_id.strip():
         raise HTTPException(
@@ -70,7 +87,7 @@ def get_compound_detail(
                 detail=f"Senyawa dengan hepatwin_id '{hepatwin_id}' tidak ditemukan atau tidak tersedia untuk simulasi 3D (is_simulatable = FALSE)."
             )
             
-        return CompoundDetail(
+        detail_response = CompoundDetail(
             hepatwin_id=item.hepatwin_id,
             compound_name=item.compound_name,
             dili_concern=item.dili_concern,
@@ -97,6 +114,19 @@ def get_compound_detail(
             segment_list=item.segment_list,
             hotspot_base_intensity=item.hotspot_base_intensity
         )
+        
+        # Implementasi ETag
+        etag_string = f"{item.hepatwin_id}_{item.molecular_weight}"
+        etag_hash = f'"{hashlib.md5(etag_string.encode("utf-8")).hexdigest()}"'
+        
+        if request and request.headers.get("if-none-match") == etag_hash:
+            return Response(status_code=304)
+            
+        if response:
+            response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
+            response.headers["ETag"] = etag_hash
+            
+        return detail_response
     except HTTPException:
         raise
     except OperationalError as e:

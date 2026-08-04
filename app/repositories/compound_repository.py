@@ -2,44 +2,94 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, or_, func
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from app.models.domain import HepatwinCompound
-from functools import lru_cache
+from cachetools import TTLCache
+from cachetools.keys import hashkey
+import threading
 from typing import List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
 
-@lru_cache(maxsize=512)
+_search_cache = TTLCache(maxsize=2048, ttl=86400)
+_search_lock = threading.Lock()
+
 def _cached_search_ids(query: str, limit: int) -> List[str]:
     """
-    LRU Cache helper untuk ID autocomplete senyawa populer.
-    Menggunakan SessionLocal independen tanpa menahan koneksi terbuka.
+    TTLCache helper untuk ID autocomplete senyawa populer.
+    Menggunakan double-checked locking untuk menghindari Cache Stampede (Thundering Herd).
     """
-    from app.core.database import SessionLocal
-    db = SessionLocal()
+    key = hashkey(query, limit)
     try:
-        clean_query = query.strip().lower()
-        stmt = (
-            select(HepatwinCompound.hepatwin_id)
-            .where(HepatwinCompound.is_simulatable.is_(True))
-            .where(
-                or_(
-                    func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%"),
-                    func.lower(HepatwinCompound.compound_name_normalized).like(f"{clean_query}%"),
-                    func.lower(HepatwinCompound.compound_name).like(f"%{clean_query}%")
+        return _search_cache[key]
+    except KeyError:
+        with _search_lock:
+            if key in _search_cache:
+                return _search_cache[key]
+            
+            from app.core.database import SessionLocal
+            db = SessionLocal()
+            try:
+                clean_query = query.strip().lower()
+                stmt = (
+                    select(HepatwinCompound.hepatwin_id)
+                    .where(HepatwinCompound.is_simulatable.is_(True))
+                    .where(
+                        or_(
+                            func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%"),
+                            func.lower(HepatwinCompound.compound_name_normalized).like(f"{clean_query}%"),
+                            func.lower(HepatwinCompound.compound_name).like(f"%{clean_query}%")
+                        )
+                    )
+                    .order_by(
+                        func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%").desc(),
+                        HepatwinCompound.compound_name.asc()
+                    )
+                    .limit(limit)
                 )
-            )
-            .order_by(
-                func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%").desc(),
-                HepatwinCompound.compound_name.asc()
-            )
-            .limit(limit)
-        )
-        return list(db.scalars(stmt).all())
-    except Exception as e:
-        logger.error(f"Error pada LRU cache autocomplete: {e}")
-        return []
-    finally:
-        db.close()
+                result = list(db.scalars(stmt).all())
+                _search_cache[key] = result
+                return result
+            except Exception as e:
+                logger.error(f"Error pada LRU cache autocomplete: {e}")
+                return []
+            finally:
+                db.close()
+
+_get_compound_cache = TTLCache(maxsize=2048, ttl=86400)
+_get_compound_lock = threading.Lock()
+
+def _cached_get_compound(hepatwin_id: str) -> Optional[HepatwinCompound]:
+    """
+    TTLCache helper untuk mengambil detail senyawa secara penuh.
+    Objek di-expunge dari session agar aman disimpan di memory.
+    Menggunakan double-checked locking menghindari Cache Stampede.
+    """
+    key = hashkey(hepatwin_id)
+    try:
+        return _get_compound_cache[key]
+    except KeyError:
+        with _get_compound_lock:
+            if key in _get_compound_cache:
+                return _get_compound_cache[key]
+                
+            from app.core.database import SessionLocal
+            db = SessionLocal()
+            try:
+                stmt = (
+                    select(HepatwinCompound)
+                    .where(HepatwinCompound.hepatwin_id == hepatwin_id.strip())
+                    .where(HepatwinCompound.is_simulatable.is_(True))
+                )
+                compound = db.scalars(stmt).first()
+                if compound:
+                    db.expunge(compound)
+                _get_compound_cache[key] = compound
+                return compound
+            except Exception as e:
+                logger.error(f"Error pada TTLCache get compound: {e}")
+                return None
+            finally:
+                db.close()
 
 class CompoundRepository:
     """
@@ -58,12 +108,7 @@ class CompoundRepository:
         if not hepatwin_id or not hepatwin_id.strip():
             return None
 
-        stmt = (
-            select(HepatwinCompound)
-            .where(HepatwinCompound.hepatwin_id == hepatwin_id.strip())
-            .where(HepatwinCompound.is_simulatable.is_(True))
-        )
-        return self.db.scalars(stmt).first()
+        return _cached_get_compound(hepatwin_id)
 
     def search_by_name(self, query: str, limit: int = 10) -> List[HepatwinCompound]:
         """
