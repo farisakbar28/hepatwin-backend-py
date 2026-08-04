@@ -25,10 +25,26 @@ def autocomplete_compounds(
             detail="Parameter pencarian 'q' tidak boleh kosong."
         )
 
+    import re
+    # Heuristik sederhana: Jika mengandung karakter kimia spesifik (seperti '=' atau '#')
+    # atau banyak bracket yang mengindikasikan string SMILES/InChI
+    smiles_pattern = re.compile(r"(=|#|\[|\]|\(|\))")
+    if smiles_pattern.search(q):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Input string SMILES atau karakter tidak valid ditolak untuk mencegah halusinasi. Harap gunakan nama obat (INN)."
+        )
+
     try:
         repo = CompoundRepository(db)
         results = repo.search_by_name(query=q, limit=limit)
         
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Senyawa '{q}' tidak ditemukan di database tertutup kami atau berstatus is_simulatable = FALSE."
+            )
+
         items = [
             CompoundItem(
                 hepatwin_id=item.hepatwin_id,
