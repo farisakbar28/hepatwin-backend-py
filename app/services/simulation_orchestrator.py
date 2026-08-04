@@ -1,128 +1,128 @@
-from fastapi import HTTPException
-from app.models.schemas import SimulationRequest, SimulationResponse
-from app.services.pkpd_engine import AcetaminophenPKPDEngine
-from app.services.ai_engine import HybridAIEngine
-from app.core.config import settings
 import logging
+import asyncio
+from typing import List, Dict, Any
+from sqlalchemy.orm import Session
+from fastapi import HTTPException
+from app.models.domain import HepatwinCompound
+from app.services.lookup_service import CompoundRepository
+from app.services.ai_engine import HybridAIEngine
+from app.services.pbpk_engine import PBPKEngine
+from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class SimulationOrchestrator:
     def __init__(self):
-        self.pkpd_engine = AcetaminophenPKPDEngine()
         self.ai_engine = HybridAIEngine(model_path=settings.AI_MODEL_PATH)
+        self.pbpk_engine = PBPKEngine()
 
-    def handle_request(self, req: SimulationRequest) -> SimulationResponse:
-        mode = req.mode
-        dose = req.dose_mg_kg if req.dose_mg_kg is not None else 15.0
+    async def handle_simulation(self, request: SimulationRequest, db: Session) -> SimulationResponse:
+        # 1. Lookup Senyawa di Database (OFFLINE & DETERMINISTIK)
+        repo = CompoundRepository(db)
+        compound = repo.get_by_id(request.hepatwin_id)
         
-        compound_id = req.compound_id
-        smiles = req.smiles_string
+        if not compound:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Senyawa dengan hepatwin_id '{request.hepatwin_id}' tidak ditemukan atau tidak simulatable (is_simulatable = FALSE)."
+            )
 
-        if mode == "edukasi_mendalam":
-            if compound_id not in ["paracetamol", "amox_clav"]:
-                raise HTTPException(status_code=400, detail="compound_id harus 'paracetamol' atau 'amox_clav'")
-            
-            if compound_id == "paracetamol":
-                return self._simulate_paracetamol(dose)
-            elif compound_id == "amox_clav":
-                return self._simulate_amox_clav(dose)
-        
-        else: # triase_umum
-            if not smiles:
-                raise HTTPException(status_code=400, detail="smiles_string wajib untuk mode triase_umum")
-            
-            if not self.ai_engine.validate_smiles(smiles):
-                raise HTTPException(status_code=400, detail="smiles_string tidak valid")
-            return self._simulate_triase(smiles)
+        smiles = compound.canonical_smiles or compound.isomeric_smiles
+        if not smiles:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Senyawa '{compound.compound_name}' tidak memiliki struktur SMILES yang valid untuk disimulasikan."
+            )
 
-    def _simulate_paracetamol(self, dose: float) -> SimulationResponse:
-        time_series = self.pkpd_engine.simulate_napqi_gsh_dynamics(dose)
-        nomogram = self.pkpd_engine.get_nomogram_data(dose)
-        score = self.ai_engine.predict_dili_risk("paracetamol_mock")
-        
-        risk_level = "low"
-        if score > 0.66:
-            risk_level = "high"
-        elif score >= 0.33:
-            risk_level = "medium"
-            
-        return SimulationResponse(
-            mode="edukasi_mendalam",
-            compound_name="Paracetamol",
-            input_smiles=None,
-            dose_mg_kg=dose,
-            DILI_score=score,
-            risk_level=risk_level,
-            damage_severity=min(1.0, dose / 150.0), # Simplifikasi proporsional dosis
-            compound_class="dose_dependent",
-            model_confidence_note="Estimasi awal berbasis model riset, bukan hasil uji klinis.",
-            disclaimer_permanent="HepaTwin adalah alat bantu edukasi dan triase awal, BUKAN pengganti uji toksisitas atau keputusan klinis.",
-            disclaimer_hideable=True,
-            affected_zone="Zone_3",
-            supports_micro_zoom=True,
-            explainability=self.ai_engine.get_explainability("CC(=O)NC1=CC=C(O)C=C1"),
-            visual_pattern="centrilobular_necrosis",
-            time_series_pkpd=time_series,
-            nomogram_data=nomogram
+        # 2. EKSEKUSI PARALEL-ASINKRON (AI Predictor & PBPK Solver)
+        # Menjalankan AI Inference & PBPK ODE Solver secara bersamaan via asyncio
+        loop = asyncio.get_running_loop()
+
+        # Task A: AI Predictor (PyTorch GATNN-DNN + SHAP)
+        ai_task = loop.run_in_executor(
+            None, 
+            self.ai_engine.predict_dili_risk, 
+            smiles
+        )
+        shap_task = loop.run_in_executor(
+            None, 
+            self.ai_engine.get_explainability, 
+            smiles
         )
 
-    def _simulate_amox_clav(self, dose: float) -> SimulationResponse:
-        score = self.ai_engine.predict_dili_risk("amox_mock")
-        # Use the correct Amoxicillin SMILES string for SHAP explainability
-        amox_smiles = "CC1(C)SC2C(NC(=O)C(N)c3ccc(O)cc3)C(=O)N12"
-        
-        risk_level = "low"
-        if score > 0.66:
-            risk_level = "high"
-        elif score >= 0.33:
-            risk_level = "medium"
-            
-        return SimulationResponse(
-            mode="edukasi_mendalam",
-            compound_name="Amoxicillin-Clavulanate",
-            input_smiles=None,
-            dose_mg_kg=dose,
-            DILI_score=score,
-            risk_level=risk_level,
-            damage_severity=score, # Damage driven by AI score
-            compound_class="idiosyncratic",
-            model_confidence_note="Estimasi awal berbasis model riset, bukan hasil uji klinis.",
-            disclaimer_permanent="HepaTwin adalah alat bantu edukasi dan triase awal, BUKAN pengganti uji toksisitas atau keputusan klinis.",
-            disclaimer_hideable=True,
-            affected_zone="Portal_Periportal",
-            supports_micro_zoom=True,
-            explainability=self.ai_engine.get_explainability(amox_smiles),
-            visual_pattern="portal_inflammation",
-            time_series_pkpd=None,
-            nomogram_data=None
+        # Task B: PBPK Solver (SciPy ODE + Alometrik)
+        cov = request.covariates
+        pbpk_task = loop.run_in_executor(
+            None,
+            self.pbpk_engine.simulate,
+            request.dosis_mg,
+            cov.usia,
+            cov.jenis_kelamin,
+            cov.berat_badan_kg,
+            cov.tinggi_badan_cm
         )
 
-    def _simulate_triase(self, smiles: str) -> SimulationResponse:
-        score = self.ai_engine.predict_dili_risk(smiles)
-        
+        # Tunggu luaran kedua mesin secara asinkron
+        dili_score, explainability_shap, (time_series_data, cmax_hati, auc_hati) = await asyncio.gather(
+            ai_task, shap_task, pbpk_task
+        )
+
+        # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
+        # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
         risk_level = "low"
-        if score > 0.66:
+        visual_color = "green"
+        blinking_speed = "none"
+
+        if dili_score > 0.70 or (dili_score >= 0.50 and (cov.usia >= 60 or cov.berat_badan_kg / ((cov.tinggi_badan_cm/100)**2) >= 30)):
             risk_level = "high"
-        elif score >= 0.33:
+            visual_color = "red"
+            blinking_speed = "fast"
+        elif dili_score >= 0.30:
             risk_level = "medium"
-            
+            visual_color = "yellow"
+            blinking_speed = "slow"
+
+        # B. Pemetaan Segmen Couinaud dari Monograf LiverTox
+        injury_pattern = compound.injury_pattern or "Fallback_Diffuse"
+        affected_segments: List[str] = []
+
+        if compound.segment_list:
+            # Segment list disimpan sebagai koma terpisah, misal "V,VI,VII,VIII"
+            affected_segments = [s.strip() for s in compound.segment_list.split(",") if s.strip()]
+        else:
+            # Fallback jika tidak ada monograf spesifik -> Difus seluruh segmen
+            affected_segments = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+
+        # C. Format Time Series Data
+        ts_points = [
+            TimeSeriesPBPKPoint(
+                time=pt["time"],
+                c_plasma=pt["c_plasma"],
+                c_hati=pt["c_hati"]
+            )
+            for pt in time_series_data
+        ]
+
+        disclaimer = (
+            "PENTING (MEDICAL DISCLAIMER): HepaTwin merupakan perangkat lunak penunjang keputusan (decision support system) "
+            "praklinis murni in silico. Hasil prediksi dan visualisasi 3D bertujuan membantu penyusunan hipotesis ilmiah dan "
+            "triase skrining awal, BUKAN diagnosis klinis, keputusan medis, atau pengganti mutlak bagi pengujian in vitro / in vivo. "
+            "Seluruh kalkulasi beroperasi pada tingkat Context of Use berisiko rendah berdasarkan standar ASME V&V 40 (2018)."
+        )
+
         return SimulationResponse(
-            mode="triase_umum",
-            compound_name=None,
-            input_smiles=smiles,
-            dose_mg_kg=None,
-            DILI_score=score,
+            hepatwin_id=compound.hepatwin_id,
+            compound_name=compound.compound_name,
+            dili_score=round(float(dili_score), 4),
             risk_level=risk_level,
-            damage_severity=score, # Damage driven by AI score
-            compound_class="unknown_general",
-            model_confidence_note="Estimasi awal berbasis model riset, bukan hasil uji klinis.",
-            disclaimer_permanent="Skor ini adalah estimasi awal berbasis model riset (AUC eksternal ~0,75-0,85), BUKAN hasil uji toksisitas dan BUKAN dasar keputusan keamanan obat.",
-            disclaimer_hideable=False,
-            affected_zone="Macro_Generic",
-            supports_micro_zoom=False,
-            explainability=self.ai_engine.get_explainability(smiles),
-            visual_pattern="heatmap_generik",
-            time_series_pkpd=None,
-            nomogram_data=None
+            visual_color=visual_color,
+            blinking_speed=blinking_speed,
+            affected_segments=affected_segments,
+            injury_pattern=injury_pattern,
+            explainability_shap=explainability_shap,
+            cmax_hati=cmax_hati,
+            auc_hati=auc_hati,
+            time_series_pbpk=ts_points,
+            disclaimer_permanent=disclaimer
         )

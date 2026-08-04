@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "HepaTwin Backend API"
     API_V1_STR: str = "/api/v1"
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:3000"]
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/postgres"
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
     AI_MODEL_PATH: str = "models/model.pt"
     DEBUG: bool = False
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

@@ -203,12 +203,6 @@ class HybridAIEngine:
     def predict_dili_risk(self, smiles: str) -> float:
         # Integrasi penuh (Sprint 1: inference asli pakai bobot PyG model)
         try:
-            # Handle hardcoded mock overrides for Edukasi Mendalam if needed
-            if smiles == "paracetamol_mock":
-                smiles = "CC(=O)NC1=CC=C(O)C=C1"
-            elif smiles == "amox_mock":
-                smiles = "CC1(C)SC2C(NC(=O)C(N)c3ccc(O)cc3)C(=O)N12" # Amoxicillin part
-
             data, struct_tensor = smiles_to_graph_and_features(smiles)
             if data is None:
                 return 0.5
