@@ -27,33 +27,41 @@ def _cached_search_ids(query: str, limit: int) -> List[str]:
                 return _search_cache[key]
             
             from app.core.database import SessionLocal
-            db = SessionLocal()
-            try:
-                clean_query = query.strip().lower()
-                stmt = (
-                    select(HepatwinCompound.hepatwin_id)
-                    .where(HepatwinCompound.is_simulatable.is_(True))
-                    .where(
-                        or_(
-                            func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%"),
-                            func.lower(HepatwinCompound.compound_name_normalized).like(f"{clean_query}%"),
-                            func.lower(HepatwinCompound.compound_name).like(f"%{clean_query}%")
+            
+            for attempt in range(2):
+                db = SessionLocal()
+                try:
+                    clean_query = query.strip().lower()
+                    stmt = (
+                        select(HepatwinCompound.hepatwin_id)
+                        .where(HepatwinCompound.is_simulatable.is_(True))
+                        .where(
+                            or_(
+                                func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%"),
+                                func.lower(HepatwinCompound.compound_name_normalized).like(f"{clean_query}%"),
+                                func.lower(HepatwinCompound.compound_name).like(f"%{clean_query}%")
+                            )
                         )
+                        .order_by(
+                            func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%").desc(),
+                            HepatwinCompound.compound_name.asc()
+                        )
+                        .limit(limit)
                     )
-                    .order_by(
-                        func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%").desc(),
-                        HepatwinCompound.compound_name.asc()
-                    )
-                    .limit(limit)
-                )
-                result = list(db.scalars(stmt).all())
-                _search_cache[key] = result
-                return result
-            except Exception as e:
-                logger.error(f"Error pada LRU cache autocomplete: {e}")
-                return []
-            finally:
-                db.close()
+                    result = list(db.scalars(stmt).all())
+                    _search_cache[key] = result
+                    return result
+                except (OperationalError, SQLAlchemyError) as e:
+                    logger.error(f"Error DB pada LRU cache autocomplete (attempt {attempt+1}): {e}")
+                    db.rollback()
+                    if attempt == 1:
+                        raise e
+                except Exception as e:
+                    logger.error(f"Error non-DB pada LRU cache autocomplete: {e}")
+                    raise e
+                finally:
+                    db.close()
+            return []
 
 _get_compound_cache = TTLCache(maxsize=2048, ttl=86400)
 _get_compound_lock = threading.Lock()
@@ -73,23 +81,31 @@ def _cached_get_compound(hepatwin_id: str) -> Optional[HepatwinCompound]:
                 return _get_compound_cache[key]
                 
             from app.core.database import SessionLocal
-            db = SessionLocal()
-            try:
-                stmt = (
-                    select(HepatwinCompound)
-                    .where(HepatwinCompound.hepatwin_id == hepatwin_id.strip())
-                    .where(HepatwinCompound.is_simulatable.is_(True))
-                )
-                compound = db.scalars(stmt).first()
-                if compound:
-                    db.expunge(compound)
-                _get_compound_cache[key] = compound
-                return compound
-            except Exception as e:
-                logger.error(f"Error pada TTLCache get compound: {e}")
-                return None
-            finally:
-                db.close()
+            
+            for attempt in range(2):
+                db = SessionLocal()
+                try:
+                    stmt = (
+                        select(HepatwinCompound)
+                        .where(HepatwinCompound.hepatwin_id == hepatwin_id.strip())
+                        .where(HepatwinCompound.is_simulatable.is_(True))
+                    )
+                    compound = db.scalars(stmt).first()
+                    if compound:
+                        db.expunge(compound)
+                    _get_compound_cache[key] = compound
+                    return compound
+                except (OperationalError, SQLAlchemyError) as e:
+                    logger.error(f"Error DB pada TTLCache get compound (attempt {attempt+1}): {e}")
+                    db.rollback()
+                    if attempt == 1:
+                        raise e
+                except Exception as e:
+                    logger.error(f"Error non-DB pada TTLCache get compound: {e}")
+                    raise e
+                finally:
+                    db.close()
+            return None
 
 class CompoundRepository:
     """
@@ -123,31 +139,25 @@ class CompoundRepository:
         target_ids = _cached_search_ids(clean_query, limit)
         
         if not target_ids:
-            # Fallback jika LRU cache kosong / bypass
-            stmt = (
-                select(HepatwinCompound)
-                .where(HepatwinCompound.is_simulatable.is_(True))
-                .where(
-                    or_(
-                        func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%"),
-                        func.lower(HepatwinCompound.compound_name_normalized).like(f"{clean_query}%"),
-                        func.lower(HepatwinCompound.compound_name).like(f"%{clean_query}%")
-                    )
-                )
-                .order_by(
-                    func.lower(HepatwinCompound.compound_name).like(f"{clean_query}%").desc(),
-                    HepatwinCompound.compound_name.asc()
-                )
-                .limit(limit)
-            )
-            return list(self.db.scalars(stmt).all())
+            return []
 
-        stmt = (
-            select(HepatwinCompound)
-            .where(HepatwinCompound.hepatwin_id.in_(target_ids))
-        )
-        results = {c.hepatwin_id: c for c in self.db.scalars(stmt).all()}
-        return [results[hid] for hid in target_ids if hid in results]
+        for attempt in range(2):
+            try:
+                stmt = (
+                    select(HepatwinCompound)
+                    .where(HepatwinCompound.hepatwin_id.in_(target_ids))
+                )
+                results = {c.hepatwin_id: c for c in self.db.scalars(stmt).all()}
+                return [results[hid] for hid in target_ids if hid in results]
+            except (OperationalError, SQLAlchemyError) as e:
+                logger.error(f"Error DB pada search_by_name fetching IDs (attempt {attempt+1}): {e}")
+                self.db.rollback()
+                if attempt == 1:
+                    raise e
+            except Exception as e:
+                logger.error(f"Error non-DB pada search_by_name fetching IDs: {e}")
+                raise e
+        return []
 
     # Alias untuk kompatibilitas mundur dengan test suite eksisting
     get_by_id = get_compound_by_hepatwin_id

@@ -13,7 +13,12 @@ engine = create_engine(
     pool_size=10,
     max_overflow=20,
     pool_recycle=300,
-    pool_timeout=10
+    pool_timeout=10,
+    connect_args={
+        "sslmode": "require",
+        "application_name": "hepatwin_fastapi",
+        "options": "-c statement_timeout=15000"
+    }
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
