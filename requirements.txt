@@ -12,3 +12,8 @@ scipy>=1.13.1
 numpy>=1.26.4
 shap>=0.45.1
 cachetools>=5.3.3
+
+# Featurization/model/explain untuk app/services/ai_engine.py (C10) diimpor
+# dari sini, BUKAN diduplikasi -- mencegah drift training<->inferensi
+# (EXECUTION_PLAN_FIX_MODEL.md C10 langkah 2).
+-e ./ml

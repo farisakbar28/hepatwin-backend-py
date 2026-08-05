@@ -1,220 +1,223 @@
+"""C10 -- Layanan inferensi AI GATNN-DNN (menggantikan versi GCNConv lama).
+
+Perbaikan enam cacat PROJECT_FIX_MODEL.md SS5.2 dari versi `master` lama:
+1. `GCNConv` -> `GATv2Conv` (`hepatwin_ml.models.gatnn_dnn.GatnnDnn`, C4/C6).
+2. `nn.Sigmoid()` dihapus dari `forward()` model -- sigmoid HANYA di sini
+   (`predict_dili_risk`), setelah kalibrasi (C7).
+3. Node feature 34-dim penuh (`hepatwin_ml.features.graph`, C3), bukan 4
+   nilai riil di-pad nol jadi 9.
+4. `return 0.5` diam-diam DIHAPUS -- model tidak termuat/gagal ->
+   `HTTPException(503)` eksplisit (`_require_ready`). Cacat integritas
+   ilmiah, bukan sekadar bug.
+5. SHAP di-batch satu forward pass (`hepatwin_ml.explain`, C8), bukan loop
+   serial per sampel sintetis seperti versi lama.
+6. `SMARTS_PATTERNS` versi terkoreksi -- diimpor dari `hepatwin_ml.features.smarts`
+   (satu-satunya sumber, dipakai juga saat training), TIDAK didefinisikan
+   ulang secara lokal di sini seperti versi lama (mencegah drift).
+
+Featurization/model/explainability diimpor dari `ml/` (`hepatwin_ml`, terpasang
+`-e ./ml` di `requirements.txt` root), BUKAN diduplikasi -- EXECUTION_PLAN_FIX_MODEL.md
+C10 langkah 2: "Duplikasi kode fitur adalah sumber klasik ketidakcocokan
+training<->inferensi."
+
+Kebijakan statis (C9): model dimuat SEKALI di `__init__`, `model.eval()`
+dipanggil, seluruh forward pass di bawah `torch.no_grad()`. Tidak ada jalur
+kode yang memanggil `.backward()`/`optimizer.step()`/menulis ulang bobot.
+"""
+import json
 import logging
-from typing import Optional, List
+import pickle
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import torch
-import torch.nn as nn
-from torch_geometric.nn import GCNConv, global_mean_pool
-from torch_geometric.data import Data
-import numpy as np
-import shap
+from fastapi import HTTPException, status
+from rdkit import Chem
+from torch_geometric.data import Batch
+
+from hepatwin_ml.data.standardize import standardize
+from hepatwin_ml.explain import explain
+from hepatwin_ml.features.fingerprints import dnn_feature_vector
+from hepatwin_ml.features.graph import smiles_to_graph
+from hepatwin_ml.models.gatnn_dnn import GatnnDnn
 
 logger = logging.getLogger(__name__)
 
-# Daftar SMARTS patterns untuk fitur RDKit
-SMARTS_PATTERNS = {
-    "Phenol group": "c1ccccc1O",
-    "Acetamide / Amide group": "C(=O)N",
-    "Carboxylic acid group": "C(=O)O",
-    "Sulfonamide group": "S(=O)(=O)N",
-    "Beta-lactam ring": "C1C(=O)NC1",
-    "Primary amine": "[NX3;H2,H3]",
-    "Nitro group": "N(=O)=O",
-    "Thiazole ring": "c1scnc1",
-    "Piperazine": "C1CNCCN1"
-}
+DEFAULT_MODEL_VERSION = "gatnn-dnn-fixmodel-v1"
+# Fallback hyperparameter final (PROJECT_FIX_MODEL.md SS3) -- dipakai hanya
+# bila file metadata tidak ada/gagal dibaca; nilai sesungguhnya SELALU
+# dibaca dari model_gatnn_dnn_metadata.json (C6) bila tersedia.
+_FALLBACK_HIDDEN = 64
+_FALLBACK_DROPOUT = 0.2
 
-class HybridGNN(nn.Module):
-    """
-    Arsitektur Hybrid GNN + Features.
-    """
-    def __init__(self, node_features=9, hidden_channels=64, num_struct_features=9, num_classes=1):
-        super(HybridGNN, self).__init__()
-        self.conv1 = GCNConv(node_features, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, hidden_channels)
-        
-        # Concat GNN output (hidden_channels) dengan structural features (num_struct_features)
-        self.lin = nn.Linear(hidden_channels + num_struct_features, num_classes)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x, edge_index, batch, struct_features):
-        # Lapisan Graf Molekuler
-        x = self.conv1(x, edge_index)
-        x = torch.relu(x)
-        x = self.conv2(x, edge_index)
-        x = torch.relu(x)
-        
-        # Global Pooling
-        x = global_mean_pool(x, batch)
-        
-        # Penggabungan fitur (Concatenation)
-        x = torch.cat([x, struct_features], dim=1)
-        
-        # Lapisan Klasifikasi Akhir
-        x = self.lin(x)
-        return self.sigmoid(x)
-
-def smiles_to_graph_and_features(smiles: str) -> tuple:
-    from rdkit import Chem
-    mol = Chem.MolFromSmiles(smiles)
-    if not mol:
-        return None, None
-        
-    # Ekstraksi node (atom) features
-    node_features = []
-    for atom in mol.GetAtoms():
-        # Feature 1-hot sederhana
-        features = [
-            atom.GetAtomicNum(),
-            atom.GetDegree(),
-            atom.GetValence(Chem.ValenceType.IMPLICIT),
-            int(atom.GetIsAromatic())
-        ]
-        # Pad to 9 features untuk kesesuaian arsitektur
-        features += [0] * (9 - len(features))
-        node_features.append(features)
-        
-    x = torch.tensor(node_features, dtype=torch.float)
-    
-    # Ekstraksi edge (ikatan)
-    edge_indices = []
-    for bond in mol.GetBonds():
-        i = bond.GetBeginAtomIdx()
-        j = bond.GetEndAtomIdx()
-        edge_indices += [[i, j], [j, i]]
-        
-    if edge_indices:
-        edge_index = torch.tensor(edge_indices, dtype=torch.long).t().contiguous()
-    else:
-        edge_index = torch.empty((2, 0), dtype=torch.long)
-        
-    # Ekstraksi Structural Features via SMARTS
-    struct_features = []
-    for name, smarts in SMARTS_PATTERNS.items():
-        pat = Chem.MolFromSmarts(smarts)
-        has_match = 1.0 if mol.HasSubstructMatch(pat) else 0.0
-        struct_features.append(has_match)
-        
-    struct_tensor = torch.tensor([struct_features], dtype=torch.float)
-    
-    data = Data(x=x, edge_index=edge_index)
-    return data, struct_tensor
 
 class HybridAIEngine:
+    """Model AI GATNN-DNN (GATv2Conv + DNN hybrid, PyTorch Geometric).
+
+    Instansiasi sekali per proses (lihat `app/api/dependencies.py`), bukan
+    per-request -- memuat ulang bobot model tiap request akan melanggar
+    anggaran latensi PRD UC-02 (<=5 detik total).
     """
-    Model AI Hybrid (RDKit Substructure + GNN PyTorch Geometric).
-    """
+
     def __init__(self, model_path: Optional[str] = None):
         self.model_path = model_path
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        num_struct_features = len(SMARTS_PATTERNS)
-        self.model = HybridGNN(num_struct_features=num_struct_features).to(self.device)
-        if self.model_path:
+        self.device = torch.device("cpu")  # deployment tidak menjamin GPU tersedia
+        self.model: Optional[GatnnDnn] = None
+        self.calibrator = None
+        self.model_version = DEFAULT_MODEL_VERSION
+        self.score_is_calibrated = False
+        self.ready = False
+
+        self._load_model()
+        self._load_calibrator()
+        self._warm_up()
+
+        logger.info(
+            "HybridAIEngine diinisialisasi: ready=%s model_version=%s score_is_calibrated=%s path=%s",
+            self.ready, self.model_version, self.score_is_calibrated, self.model_path,
+        )
+
+    def _warm_up(self) -> None:
+        """Jalankan satu inferensi + explain() dummy saat startup proses
+        (main thread) supaya lazy-init PyTorch/RDKit di thread INI dibayar
+        sebelum request nyata pertama. TERBUKTI mempercepat pemanggilan
+        LANGSUNG (di luar HTTP/executor) dari ~6 detik ke <10ms -- tapi
+        TIDAK cukup sendirian untuk request HTTP nyata (lihat warm-up
+        tambahan di app/main.py startup event + catatan jujur di sana soal
+        sisa latensi request pertama yang akar masalahnya belum tuntas
+        ditemukan). Dipertahankan karena tetap mengurangi sebagian biaya
+        dan tidak merugikan."""
+        if not self.ready:
+            return
+        try:
+            self.predict_dili_risk("C")  # metana -- molekul valid paling sederhana
+            self.get_shap_detail("C")
+        except Exception as exc:  # noqa: BLE001 -- warm-up gagal tidak boleh menggagalkan startup
+            logger.warning("Warm-up inferensi gagal (non-fatal, lanjut startup): %s", exc)
+
+    @property
+    def model_status(self) -> str:
+        return "trained" if self.ready else "unavailable"
+
+    def _load_model(self) -> None:
+        if not self.model_path:
+            logger.error("AI_MODEL_PATH tidak diset -- HybridAIEngine tidak bisa memuat model.")
+            return
+
+        model_file = Path(self.model_path)
+        metadata_file = model_file.with_name(model_file.stem + "_metadata.json")
+
+        hidden, dropout = _FALLBACK_HIDDEN, _FALLBACK_DROPOUT
+        if metadata_file.exists():
             try:
-                self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
-                logger.info(f"Loaded weights from {self.model_path}")
-            except Exception as e:
-                logger.warning(f"Could not load weights from {self.model_path}: {e}. Using random weights.")
-        self.model.eval() # Set to evaluation mode
-        
-        logger.info(f"HybridAIEngine initialized on {self.device}. Path: {model_path}")
-        self.ready = True
+                metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+                hp = metadata.get("hyperparameters", {})
+                hidden = hp.get("hidden", hidden)
+                dropout = hp.get("dropout", dropout)
+                self.model_version = metadata.get("model_version", self.model_version)
+            except Exception as exc:  # noqa: BLE001 -- gagal baca metadata bukan alasan crash total
+                logger.warning("Gagal membaca metadata model %s: %s -- pakai fallback hyperparameter.", metadata_file, exc)
+
+        if not model_file.exists():
+            logger.error(
+                "Artefak model tidak ditemukan di %s -- HybridAIEngine TIDAK siap "
+                "(predict_dili_risk akan menolak dengan 503, bukan skor palsu).",
+                model_file,
+            )
+            return
+
+        try:
+            model = GatnnDnn(hidden=hidden, dropout=dropout)
+            state_dict = torch.load(model_file, map_location=self.device, weights_only=True)
+            model.load_state_dict(state_dict)
+            model.eval()  # kebijakan statis C9 -- model tidak pernah dikembalikan ke train()
+            self.model = model
+            self.ready = True
+        except Exception as exc:  # noqa: BLE001 -- dicatat, engine tetap "not ready" (bukan crash proses)
+            logger.error("Gagal memuat state_dict model dari %s: %s", model_file, exc)
+            self.model = None
+            self.ready = False
+
+    def _load_calibrator(self) -> None:
+        if not self.model_path:
+            return
+        calibrator_file = Path(self.model_path).with_name("calibrator_gatnn_dnn.pkl")
+        if not calibrator_file.exists():
+            logger.warning(
+                "Kalibrator tidak ditemukan di %s -- dili_score TIDAK terkalibrasi "
+                "(sigmoid mentah, score_is_calibrated=False).",
+                calibrator_file,
+            )
+            return
+        try:
+            with open(calibrator_file, "rb") as f:
+                self.calibrator = pickle.load(f)
+            self.score_is_calibrated = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Gagal memuat kalibrator dari %s: %s -- lanjut tanpa kalibrasi.", calibrator_file, exc)
+
+    def _require_ready(self) -> None:
+        """Cacat #4 (PROJECT_FIX_MODEL.md SS5.2): TIDAK ADA fallback skor 0.5
+        diam-diam. Model tidak termuat -> 503 eksplisit, selalu, tanpa kecuali."""
+        if not self.ready or self.model is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Model AI GATNN-DNN tidak tersedia (artefak gagal dimuat saat startup). "
+                    "Tidak ada prediksi yang dapat dikembalikan."
+                ),
+            )
+
+    def _standardize_or_422(self, smiles: str):
+        std = standardize(smiles) if smiles else None
+        if std is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"SMILES tidak valid atau gagal diparse RDKit: {smiles!r}",
+            )
+        return std
 
     def validate_smiles(self, smiles: str) -> bool:
-        """
-        Validasi SMILES dasar menggunakan RDKit.
-        """
-        if not smiles or not isinstance(smiles, str) or len(smiles.strip()) == 0:
+        """Validasi dasar -- dipakai pemanggil yang hanya perlu tahu SMILES
+        bisa distandardisasi, tanpa menjalankan model."""
+        if not smiles or not isinstance(smiles, str):
             return False
-        
-        try:
-            from rdkit import Chem
-            mol = Chem.MolFromSmiles(smiles)
-            return mol is not None
-        except Exception:
-            return False
-
-    def get_explainability(self, smiles: str) -> List[str]:
-        # Implementasi SHAP attribution
-        try:
-            from rdkit import Chem
-            mol = Chem.MolFromSmiles(smiles)
-            if not mol:
-                return ["Invalid Structure"]
-
-            data, struct_tensor = smiles_to_graph_and_features(smiles)
-            if data is None:
-                return ["Feature Extraction Failed"]
-                
-            data = data.to(self.device)
-            struct_tensor = struct_tensor.to(self.device)
-            batch = torch.zeros(data.x.size(0), dtype=torch.long).to(self.device)
-
-            # SHAP explainer untuk layer struktural (memerlukan wrapper function)
-            # Karena GNN kompleks di SHAP, kita targetkan substruktur RDKit
-            
-            def model_predict(struct_input):
-                # struct_input is shape (n_samples, n_features)
-                n_samples = struct_input.shape[0]
-                
-                # Expand data.x and data.edge_index to match n_samples if n_samples > 1
-                # Because SHAP generates multiple synthetic samples
-                out_scores = []
-                for i in range(n_samples):
-                    struct_t = torch.tensor(struct_input[i:i+1], dtype=torch.float).to(self.device)
-                    with torch.no_grad():
-                        out = self.model(data.x, data.edge_index, batch, struct_t)
-                    out_scores.append(out.cpu().numpy()[0])
-                return np.array(out_scores)
-
-            # Baseline kosong (semua substruktur = 0)
-            background = np.zeros((1, len(SMARTS_PATTERNS)))
-            explainer = shap.KernelExplainer(model_predict, background)
-            
-            # Hitung SHAP value untuk fitur molekul saat ini
-            shap_values = explainer.shap_values(struct_tensor.cpu().numpy(), silent=True)
-            
-            # Ekstrak fitur yang paling berkontribusi positif
-            contributing_features = []
-            feature_names = list(SMARTS_PATTERNS.keys())
-            
-            # shap_values[0] adalah prediksi untuk sample pertama
-            # Nilai SHAP > 0 berarti meningkatkan risiko DILI
-            sv = shap_values[0] if isinstance(shap_values, list) else shap_values[0]
-            
-            for i, val in enumerate(sv):
-                if val > 0.001 and struct_tensor[0][i].item() == 1.0:
-                    contributing_features.append(feature_names[i])
-                    
-            if not contributing_features:
-                # Jika tidak ada atribusi kuat dari SHAP, fallback ke fitur struktural yang ada
-                for i, val in enumerate(struct_tensor[0]):
-                    if val.item() == 1.0:
-                        contributing_features.append(feature_names[i])
-                
-            if not contributing_features:
-                contributing_features = ["General structural features"]
-                
-            return contributing_features
-            
-        except Exception as e:
-            logger.error(f"SHAP error: {e}")
-            return ["Explainability evaluation error"]
+        return standardize(smiles) is not None
 
     def predict_dili_risk(self, smiles: str) -> float:
-        # Integrasi penuh (Sprint 1: inference asli pakai bobot PyG model)
-        try:
-            data, struct_tensor = smiles_to_graph_and_features(smiles)
-            if data is None:
-                return 0.5
-                
-            data = data.to(self.device)
-            struct_tensor = struct_tensor.to(self.device)
-            batch = torch.zeros(data.x.size(0), dtype=torch.long).to(self.device)
-            
-            with torch.no_grad():
-                score = self.model(data.x, data.edge_index, batch, struct_tensor)
-                
-            return float(score.item())
-        except Exception as e:
-            logger.error(f"Prediction error: {e}")
-            return 0.5
+        """SMILES -> P(DILI) terkalibrasi (float, 0..1).
+
+        `HTTPException(503)` bila model tidak termuat, `HTTPException(422)`
+        bila SMILES tidak valid -- TIDAK PERNAH diam-diam mengembalikan 0.5.
+        """
+        self._require_ready()
+        std = self._standardize_or_422(smiles)
+
+        graph_data = smiles_to_graph(std.canonical_smiles)
+        mol = Chem.MolFromSmiles(std.canonical_smiles)
+        fingerprint = torch.tensor(dnn_feature_vector(mol), dtype=torch.float).unsqueeze(0)
+
+        batch = Batch.from_data_list([graph_data])
+        batch.fingerprint = fingerprint
+        with torch.no_grad():
+            logit = self.model(batch)
+            prob = torch.sigmoid(logit).item()
+
+        if self.calibrator is not None:
+            prob = float(self.calibrator.predict([prob])[0])
+
+        return float(prob)
+
+    def get_shap_detail(self, smiles: str) -> Dict[str, Any]:
+        """SMILES -> keluaran `explain()` C8 penuh: method, groups (gugus
+        SMARTS + atom_indices), atoms (atribusi per-atom), smiles_used."""
+        self._require_ready()
+        std = self._standardize_or_422(smiles)
+        return explain(self.model, std.canonical_smiles, std.inchikey)
+
+    def get_explainability(self, smiles: str) -> List[str]:
+        """Kompatibilitas mundur untuk `explainability_shap: List[str]`
+        (skema lama) -- nama gugus saja, diturunkan dari `get_shap_detail()`
+        (satu sumber, tidak menghitung ulang secara terpisah)."""
+        detail = self.get_shap_detail(smiles)
+        return [g["name"] for g in detail["groups"]]

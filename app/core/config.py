@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
-    AI_MODEL_PATH: str = "models/model.pt"
+    AI_MODEL_PATH: str = "app/models/model_gatnn_dnn.pt"
     DEBUG: bool = False
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

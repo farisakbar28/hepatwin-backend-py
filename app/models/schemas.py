@@ -19,15 +19,6 @@ class CompoundDetail(CompoundItem):
     molecular_weight: Optional[float] = Field(None)
     tpsa: Optional[float] = Field(None)
     xlogp: Optional[float] = Field(None)
-    iupac_name: Optional[str] = Field(None)
-    heavy_atom_count: Optional[int] = Field(None)
-    hydrogen_bond_donor_count: Optional[int] = Field(None)
-    hydrogen_bond_acceptor_count: Optional[int] = Field(None)
-    rotatable_bond_count: Optional[int] = Field(None)
-    exact_mass: Optional[float] = Field(None)
-    monoisotopic_mass: Optional[float] = Field(None)
-    charge: Optional[int] = Field(None)
-    complexity: Optional[float] = Field(None)
     injury_pattern: Optional[str] = Field(None)
     segment_list: Optional[str] = Field(None)
     hotspot_base_intensity: Optional[str] = Field(None)
@@ -69,3 +60,18 @@ class SimulationResponse(BaseModel):
     auc_hati: float = Field(..., description="Area Under Curve konsentrasi obat di hati")
     time_series_pbpk: List[TimeSeriesPBPKPoint] = Field(..., description="Kurva konsentrasi C_hati(t) & C_plasma(t) 24 jam")
     disclaimer_permanent: str = Field(..., description="Medical Disclaimer resmi HepaTwin (ASME V&V 40)")
+
+    # --- C10 gerbang G6: perluasan kontrak API untuk SHAP tingkat atom ---
+    # [KEPUTUSAN AI -- PENDING REVIEW KETUA TIM + FARIS] Optional dengan
+    # default None -- backward-compatible, tidak memecah konsumen lama yang
+    # belum tahu field ini. Usulan skema di EXECUTION_PLAN_FIX_MODEL.md C10
+    # langkah 3.
+    shap_detail: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Struktur lengkap C8: {method, groups:[{name,value,atom_indices}], atoms:[{idx,value}], smiles_used}",
+    )
+    model_version: Optional[str] = Field(None, description='Versi model AI, mis. "gatnn-dnn-fixmodel-v1"')
+    model_status: Optional[Literal["trained", "unavailable"]] = Field(
+        None, description="Status model AI -- mencegah kebingungan model asli vs tidak ada"
+    )
+    score_is_calibrated: Optional[bool] = Field(None, description="True bila dili_score sudah melalui kalibrator (C7)")
