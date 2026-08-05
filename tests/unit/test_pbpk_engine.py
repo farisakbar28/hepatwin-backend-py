@@ -24,6 +24,7 @@ def test_pbpk_engine_simulation_mass_balance():
     assert auc > 0.0
     
     # Check that %BF is correctly calculated in params
-    params = engine.calculate_allometric_parameters(usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm)
-    assert "bf_percent" in params
-    assert params["bf_percent"] > 0
+    from app.services.allometric_service import AllometricService
+    params = AllometricService.calculate_physiological_parameters(usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm)
+    assert "body_fat_pct" in params
+    assert params["body_fat_pct"] > 0

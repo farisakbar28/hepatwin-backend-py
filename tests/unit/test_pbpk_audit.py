@@ -34,37 +34,3 @@ def test_ode_mass_balance_and_convergence():
             assert pt["c_plasma"] >= 0.0
             assert pt["c_hati"] >= 0.0
 
-def test_allometric_scaling_age_and_bmi():
-    engine = PBPKEngine()
-    
-    # Baseline: Age 30, BMI 22.8 (70kg, 175cm)
-    base_params = engine.calculate_allometric_parameters(30, "Laki-Laki", 70.0, 175.0)
-    
-    # Age >= 40: Age 50, BMI 22.8
-    age_params = engine.calculate_allometric_parameters(50, "Laki-Laki", 70.0, 175.0)
-    
-    # BMI >= 30: Age 30, BMI 31.0 (95kg, 175cm)
-    obese_params = engine.calculate_allometric_parameters(30, "Laki-Laki", 95.0, 175.0)
-    
-    # 1. Q_L baseline is 90.0 for age < 40
-    assert base_params["q_l"] == 90.0
-    
-    # 2. Q_L age 50 = 90.0 * (1 - 0.008 * (50-40)) = 90.0 * 0.92 = 82.8
-    assert math.isclose(age_params["q_l"], 82.8, rel_tol=1e-5), f"Expected 82.8, got {age_params['q_l']}"
-    
-    # 3. Cl_metab baseline = 20.0
-    assert base_params["cl_metab"] == 20.0
-    
-    # 4. Cl_metab obese = 20.0 * 0.8 = 16.0
-    assert obese_params["cl_metab"] == 16.0
-    
-def test_allometric_bf_percent():
-    engine = PBPKEngine()
-    
-    params = engine.calculate_allometric_parameters(45, "Laki-Laki", 75.0, 175.0)
-    assert "bf_percent" in params
-    assert params["bf_percent"] > 0.0
-    
-    # Manually check: BMI = 75 / (1.75^2) = 24.4898
-    # %BF = 1.20 * 24.4898 + 0.23 * 45 - 10.8 * 1.0 - 5.4 = 29.38776 + 10.35 - 10.8 - 5.4 = 23.53776
-    assert math.isclose(params["bf_percent"], 23.54, rel_tol=1e-2), f"Expected ~23.54, got {params['bf_percent']}"

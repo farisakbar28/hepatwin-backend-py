@@ -1,5 +1,3 @@
-from .pbpk_engine import PBPKEngine
-from .ai_engine import HybridAIEngine
-from .simulation_orchestrator import SimulationOrchestrator
-
-__all__ = ["PBPKEngine", "HybridAIEngine", "SimulationOrchestrator"]
+# Modul dibiarkan kosong untuk mencegah kebocoran ekspor (import leak)
+# yang memaksa pemuatan library berat (SciPy/PyTorch) saat pengujian unit parsial.
+__all__ = []

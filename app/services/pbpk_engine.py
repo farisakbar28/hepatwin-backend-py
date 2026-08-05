@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple
 from scipy.integrate import solve_ivp
 import numpy as np
 from functools import lru_cache
+from app.services.allometric_service import AllometricService
 
 logger = logging.getLogger(__name__)
 
@@ -62,83 +63,16 @@ class PBPKEngine:
         # Mode 4 Remediation: Pre-warm CPU cache solver for test baseline (Age 45, Male, 75kg, 175cm)
         self._simulate_base(45, "Laki-Laki", 75.0, 175.0, 24.0, 0.1)
 
-    def calculate_allometric_parameters(
-        self, 
-        usia: int, 
-        jenis_kelamin: str, 
-        berat_badan_kg: float, 
-        tinggi_badan_cm: float
-    ) -> Dict[str, float]:
-        """
-        Kovariat Pasien -> Penskalaan Alometrik Deterministik:
-        1. BMI = Berat / (Tinggi/100)^2
-        2. V_L = 0.025 * Berat (Volume Hati)
-        3. %BF = 1.20 * BMI + 0.23 * Usia - 10.8 * Sex - 5.4 (Deurenberg et al.)
-        4. Q_L = Baseline * [1 - 0.008 * (Usia - 40)] jika Usia >= 40 (Soejima et al.)
-        5. Reduksi Klirens ~20% jika BMI >= 30 (MASLD/Obesitas)
-        """
-        tinggi_m = tinggi_badan_cm / 100.0
-        bmi = berat_badan_kg / (tinggi_m ** 2)
-        
-        # %BF = 1.20 * BMI + 0.23 * Usia - 10.8 * Sex - 5.4 (Deurenberg et al.)
-        sex_factor = 1.0 if jenis_kelamin.lower() in ["l", "laki-laki", "male", "m", "pria"] else 0.0
-        bf_percent = 1.20 * bmi + 0.23 * usia - 10.8 * sex_factor - 5.4
-        
-        # Volume Anatomi (L)
-        v_l = 0.025 * berat_badan_kg # 2.5% dari berat badan
-        v_p = 0.05 * berat_badan_kg  # Plasma ~5%
-        v_k = 0.004 * berat_badan_kg # Ginjal ~0.4%
-        v_r = 0.60 * berat_badan_kg  # Jaringan sisa ~60%
-        
-        # Laju Aliran Darah Hepatik Q_L (L/jam)
-        q_l_baseline = 90.0 # L/jam baseline dewasa
-        if usia >= 40:
-            q_l = q_l_baseline * (1.0 - 0.008 * (usia - 40))
-        else:
-            q_l = q_l_baseline
-            
-        q_k = 70.0 # L/jam aliran darah ginjal
-        q_r = 150.0 # L/jam sisa jaringan
-        
-        # Klirens Metabolisme Hepatik (L/jam)
-        cl_metab = 20.0
-        if bmi >= 30.0:
-            cl_metab *= 0.8 # Reduksi 20% pada obesitas (BMI >= 30)
-            
-        cl_renal = 5.0 # L/jam
-        
-        # Koefisien Partisi Jaringan-Plasma (K_p)
-        kp_l = 1.5
-        kp_k = 1.2
-        kp_r = 1.0
-        
-        return {
-            "bmi": round(bmi, 2),
-            "bf_percent": round(bf_percent, 2),
-            "v_p": v_p,
-            "v_l": v_l,
-            "v_k": v_k,
-            "v_r": v_r,
-            "q_l": q_l,
-            "q_k": q_k,
-            "q_r": q_r,
-            "cl_metab": cl_metab,
-            "cl_renal": cl_renal,
-            "kp_l": kp_l,
-            "kp_k": kp_k,
-            "kp_r": kp_r,
-        }
-
     def _verify_mass_balance(self, sol_y: np.ndarray, params: Dict[str, float], dosis_mg: float) -> None:
         """
         Verifikasi kekekalan massa pada setiap langkah waktu.
         M_total = C_P*V_P + C_L*V_L + C_K*V_K + C_R*V_R + A_metab + A_renal
         M_total harus mendekati Dosis Awal (D_0) dengan toleransi error relatif < 1e-4
         """
-        v_p = params["v_p"]
-        v_l = params["v_l"]
-        v_k = params["v_k"]
-        v_r = params["v_r"]
+        v_p = params["V_P"]
+        v_l = params["V_L"]
+        v_k = params["V_K"]
+        v_r = params["V_R"]
         
         c_p = sol_y[0]
         c_l = sol_y[1]
@@ -171,20 +105,20 @@ class PBPKEngine:
         duration_hours: float,
         step_hours: float
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, float]]:
-        params = self.calculate_allometric_parameters(usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm)
+        params = AllometricService.calculate_physiological_parameters(usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm)
         
         # Simulasi selalu dijalankan untuk basis dosis 1.0 mg
         dosis_base = 1.0
-        c_p0 = dosis_base / params["v_p"]
+        c_p0 = dosis_base / params["V_P"]
         y0 = [c_p0, 0.0, 0.0, 0.0, 0.0, 0.0]
         
         t_eval = np.arange(0, duration_hours + step_hours, step_hours)
         
         args_tuple = (
-            params["v_p"], params["v_l"], params["v_k"], params["v_r"],
-            params["q_l"], params["q_k"], params["q_r"],
-            params["cl_metab"], params["cl_renal"],
-            params["kp_l"], params["kp_k"], params["kp_r"]
+            params["V_P"], params["V_L"], params["V_K"], params["V_R"],
+            params["Q_L"], params["Q_K"], params["Q_R"],
+            params["Cl_metabolism"], params["Cl_renal"],
+            params["K_P_L"], params["K_P_K"], params["K_P_R"]
         )
         
         sol = solve_ivp(
