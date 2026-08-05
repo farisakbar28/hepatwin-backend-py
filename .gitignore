@@ -24,6 +24,8 @@ node_modules/
 
 # Python / Go (Virtual environments & binaries)
 venv/
+.venv/
+.venv-ml/
 .env/
 /bin
 *.exe
@@ -115,9 +117,24 @@ opencode.json
 # ==========================================
 # 8. AI MODELS & WEIGHTS
 # ==========================================
-models/
+# ml/ pipeline: raw/interim/processed data & intermediate checkpoints are
+# reproducible from Supabase + code, not committed (see ml/README.md)
+ml/data/interim/*
+ml/data/processed/*
+ml/models/
+*.egg-info/
+
+# C2/C5 provenance seals: committed on purpose so git history proves the
+# featurization snapshot and train/val/test split were not altered after the fact
+!ml/data/interim/compounds_snapshot.parquet
+!ml/data/interim/split_manifest.json
+
+# Model weights are ignored by default, except the final artifacts served by app/
 *.pt
 *.pth
 *.h5
+!app/models/*.pt
+!app/models/*.pth
+!app/models/*.h5
 
 HepaTwin_Draft_Proposal_GEMASTIK_XIX_2026.md
