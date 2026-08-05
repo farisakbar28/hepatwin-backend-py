@@ -60,3 +60,18 @@ class SimulationResponse(BaseModel):
     auc_hati: float = Field(..., description="Area Under Curve konsentrasi obat di hati")
     time_series_pbpk: List[TimeSeriesPBPKPoint] = Field(..., description="Kurva konsentrasi C_hati(t) & C_plasma(t) 24 jam")
     disclaimer_permanent: str = Field(..., description="Medical Disclaimer resmi HepaTwin (ASME V&V 40)")
+
+    # --- C10 gerbang G6: perluasan kontrak API untuk SHAP tingkat atom ---
+    # [KEPUTUSAN AI -- PENDING REVIEW KETUA TIM + FARIS] Optional dengan
+    # default None -- backward-compatible, tidak memecah konsumen lama yang
+    # belum tahu field ini. Usulan skema di EXECUTION_PLAN_FIX_MODEL.md C10
+    # langkah 3.
+    shap_detail: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Struktur lengkap C8: {method, groups:[{name,value,atom_indices}], atoms:[{idx,value}], smiles_used}",
+    )
+    model_version: Optional[str] = Field(None, description='Versi model AI, mis. "gatnn-dnn-fixmodel-v1"')
+    model_status: Optional[Literal["trained", "unavailable"]] = Field(
+        None, description="Status model AI -- mencegah kebingungan model asli vs tidak ada"
+    )
+    score_is_calibrated: Optional[bool] = Field(None, description="True bila dili_score sudah melalui kalibrator (C7)")

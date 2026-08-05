@@ -41,13 +41,18 @@ class SimulationOrchestrator:
 
         # Task A: AI Predictor (PyTorch GATNN-DNN + SHAP)
         ai_task = loop.run_in_executor(
-            None, 
-            self.ai_engine.predict_dili_risk, 
+            None,
+            self.ai_engine.predict_dili_risk,
             smiles
         )
+        # [KEPUTUSAN AI -- PENDING REVIEW KETUA TIM + FARIS, C10 gerbang G6]
+        # get_shap_detail() (bukan get_explainability()) supaya shap_detail
+        # tingkat atom (C8) bisa masuk SimulationResponse tanpa memanggil
+        # explain() dua kali -- explainability_shap (List[str]) diturunkan
+        # dari shap_detail["groups"] di bawah, satu sumber komputasi.
         shap_task = loop.run_in_executor(
-            None, 
-            self.ai_engine.get_explainability, 
+            None,
+            self.ai_engine.get_shap_detail,
             smiles
         )
 
@@ -64,9 +69,10 @@ class SimulationOrchestrator:
         )
 
         # Tunggu luaran kedua mesin secara asinkron
-        dili_score, explainability_shap, (time_series_data, cmax_hati, auc_hati) = await asyncio.gather(
+        dili_score, shap_detail, (time_series_data, cmax_hati, auc_hati) = await asyncio.gather(
             ai_task, shap_task, pbpk_task
         )
+        explainability_shap = [g["name"] for g in shap_detail["groups"]]
 
         # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
         # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
@@ -124,5 +130,9 @@ class SimulationOrchestrator:
             cmax_hati=cmax_hati,
             auc_hati=auc_hati,
             time_series_pbpk=ts_points,
-            disclaimer_permanent=disclaimer
+            disclaimer_permanent=disclaimer,
+            shap_detail=shap_detail,
+            model_version=self.ai_engine.model_version,
+            model_status=self.ai_engine.model_status,
+            score_is_calibrated=self.ai_engine.score_is_calibrated,
         )
