@@ -7,6 +7,8 @@ from app.models.domain import HepatwinCompound
 from app.services.lookup_service import CompoundRepository
 from app.services.ai_engine import HybridAIEngine
 from app.services.pbpk_engine import PBPKEngine
+from app.services.exposure_evaluator import ExposureEvaluatorService
+from app.services.fusion_service import FusionService
 from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint
 from app.core.config import settings
 
@@ -70,18 +72,21 @@ class SimulationOrchestrator:
 
         # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
         # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
-        risk_level = "low"
-        visual_color = "green"
-        blinking_speed = "none"
-
-        if dili_score > 0.70 or (dili_score >= 0.50 and (cov.usia >= 60 or cov.berat_badan_kg / ((cov.tinggi_badan_cm/100)**2) >= 30)):
-            risk_level = "high"
-            visual_color = "red"
-            blinking_speed = "fast"
-        elif dili_score >= 0.30:
-            risk_level = "medium"
-            visual_color = "yellow"
-            blinking_speed = "slow"
+        bmi = cov.berat_badan_kg / ((cov.tinggi_badan_cm/100)**2)
+        
+        exposure_result = ExposureEvaluatorService.evaluate_relative_exposure(
+            cmax=cmax_hati,
+            auc=auc_hati,
+            age=cov.usia,
+            bmi=bmi,
+            dose_mg=request.dosis_mg,
+            weight_kg=cov.berat_badan_kg
+        )
+        
+        risk_level, visual_color, blinking_speed = FusionService.determine_visual_status(
+            dili_score=dili_score,
+            exposure_category=exposure_result["risk_level"]
+        )
 
         # B. Pemetaan Segmen Couinaud dari Monograf LiverTox
         injury_pattern = compound.injury_pattern or "Fallback_Diffuse"
