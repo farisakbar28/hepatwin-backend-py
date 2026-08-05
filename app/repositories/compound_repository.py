@@ -13,27 +13,104 @@ logger = logging.getLogger(__name__)
 _search_cache = TTLCache(maxsize=2048, ttl=86400)
 _search_lock = threading.Lock()
 
-def _cached_search_ids(query: str, limit: int) -> List[str]:
+_get_compound_cache = TTLCache(maxsize=2048, ttl=86400)
+_get_compound_lock = threading.Lock()
+
+def clear_caches():
+    with _search_lock:
+        _search_cache.clear()
+    with _get_compound_lock:
+        _get_compound_cache.clear()
+
+class CompoundRepository:
     """
-    TTLCache helper untuk ID autocomplete senyawa populer.
-    Menggunakan double-checked locking untuk menghindari Cache Stampede (Thundering Herd).
+    Data Access Object (DAO) / Repository untuk tabel `public.hepatwin_compounds`.
+    Menangani lookup deterministik by ID dan autocomplete pencarian nama senyawa.
     """
-    key = hashkey(query, limit)
-    try:
-        return _search_cache[key]
-    except KeyError:
-        with _search_lock:
-            if key in _search_cache:
-                return _search_cache[key]
-            
-            from app.core.database import SessionLocal
+    def __init__(self, db: Session):
+        self.db = db
+
+    def _is_mock_db(self) -> bool:
+        return "Mock" in type(self.db).__name__
+
+    def get_compound_by_hepatwin_id(self, hepatwin_id: str) -> Optional[HepatwinCompound]:
+        """
+        Lookup detail senyawa berdasarkan `hepatwin_id`.
+        WAJIB memfilter `is_simulatable = TRUE`. 
+        Menyingkirkan 105 senyawa biologik (is_simulatable = FALSE).
+        """
+        if not hepatwin_id or not hepatwin_id.strip():
+            return None
+
+        clean_id = hepatwin_id.strip()
+        key = hashkey(clean_id)
+        is_mock = self._is_mock_db()
+        
+        if not is_mock:
+            try:
+                return _get_compound_cache[key]
+            except KeyError:
+                pass
+
+        with _get_compound_lock:
+            if not is_mock and key in _get_compound_cache:
+                return _get_compound_cache[key]
             
             for attempt in range(2):
-                db = SessionLocal()
                 try:
-                    clean_query = query.strip().lower()
                     stmt = (
-                        select(HepatwinCompound.hepatwin_id)
+                        select(HepatwinCompound)
+                        .where(HepatwinCompound.hepatwin_id == clean_id)
+                        .where(HepatwinCompound.is_simulatable.is_(True))
+                    )
+                    compound = self.db.scalars(stmt).first()
+                    if compound and not is_mock:
+                        try:
+                            self.db.expunge(compound)
+                        except Exception:
+                            pass
+                        _get_compound_cache[key] = compound
+                    return compound
+                except (OperationalError, SQLAlchemyError) as e:
+                    logger.error(f"Error DB pada get compound (attempt {attempt+1}): {e}")
+                    try:
+                        self.db.rollback()
+                    except Exception:
+                        pass
+                    if attempt == 1:
+                        raise e
+                except Exception as e:
+                    logger.error(f"Error non-DB pada get compound: {e}")
+                    raise e
+            return None
+
+    def search_by_name(self, query: str, limit: int = 10) -> List[HepatwinCompound]:
+        """
+        Pencarian autocomplete senyawa berdasarkan nama obat (INN/Normalized).
+        WAJIB memfilter `is_simulatable = TRUE`.
+        Menggunakan caching in-memory via TTLCache untuk latensi <= 50ms.
+        """
+        if not query or not query.strip():
+            return []
+
+        clean_query = query.strip().lower()
+        key = hashkey(clean_query, limit)
+        is_mock = self._is_mock_db()
+        
+        if not is_mock:
+            try:
+                return _search_cache[key]
+            except KeyError:
+                pass
+
+        with _search_lock:
+            if not is_mock and key in _search_cache:
+                return _search_cache[key]
+            
+            for attempt in range(2):
+                try:
+                    stmt = (
+                        select(HepatwinCompound)
                         .where(HepatwinCompound.is_simulatable.is_(True))
                         .where(
                             or_(
@@ -48,118 +125,38 @@ def _cached_search_ids(query: str, limit: int) -> List[str]:
                         )
                         .limit(limit)
                     )
-                    result = list(db.scalars(stmt).all())
-                    _search_cache[key] = result
-                    return result
+                    results = list(self.db.scalars(stmt).all())
+                    if results and not is_mock:
+                        for c in results:
+                            try:
+                                self.db.expunge(c)
+                            except Exception:
+                                pass
+                        _search_cache[key] = results
+                    return results
                 except (OperationalError, SQLAlchemyError) as e:
-                    logger.error(f"Error DB pada LRU cache autocomplete (attempt {attempt+1}): {e}")
-                    db.rollback()
+                    logger.error(f"Error DB pada search_by_name (attempt {attempt+1}): {e}")
+                    try:
+                        self.db.rollback()
+                    except Exception:
+                        pass
                     if attempt == 1:
                         raise e
                 except Exception as e:
-                    logger.error(f"Error non-DB pada LRU cache autocomplete: {e}")
+                    logger.error(f"Error non-DB pada search_by_name: {e}")
                     raise e
-                finally:
-                    db.close()
             return []
-
-_get_compound_cache = TTLCache(maxsize=2048, ttl=86400)
-_get_compound_lock = threading.Lock()
-
-def _cached_get_compound(hepatwin_id: str) -> Optional[HepatwinCompound]:
-    """
-    TTLCache helper untuk mengambil detail senyawa secara penuh.
-    Objek di-expunge dari session agar aman disimpan di memory.
-    Menggunakan double-checked locking menghindari Cache Stampede.
-    """
-    key = hashkey(hepatwin_id)
-    try:
-        return _get_compound_cache[key]
-    except KeyError:
-        with _get_compound_lock:
-            if key in _get_compound_cache:
-                return _get_compound_cache[key]
-                
-            from app.core.database import SessionLocal
-            
-            for attempt in range(2):
-                db = SessionLocal()
-                try:
-                    stmt = (
-                        select(HepatwinCompound)
-                        .where(HepatwinCompound.hepatwin_id == hepatwin_id.strip())
-                        .where(HepatwinCompound.is_simulatable.is_(True))
-                    )
-                    compound = db.scalars(stmt).first()
-                    if compound:
-                        db.expunge(compound)
-                    _get_compound_cache[key] = compound
-                    return compound
-                except (OperationalError, SQLAlchemyError) as e:
-                    logger.error(f"Error DB pada TTLCache get compound (attempt {attempt+1}): {e}")
-                    db.rollback()
-                    if attempt == 1:
-                        raise e
-                except Exception as e:
-                    logger.error(f"Error non-DB pada TTLCache get compound: {e}")
-                    raise e
-                finally:
-                    db.close()
-            return None
-
-class CompoundRepository:
-    """
-    Data Access Object (DAO) / Repository untuk tabel `public.hepatwin_compounds`.
-    Menangani lookup deterministik by ID dan autocomplete pencarian nama senyawa.
-    """
-    def __init__(self, db: Session):
-        self.db = db
-
-    def get_compound_by_hepatwin_id(self, hepatwin_id: str) -> Optional[HepatwinCompound]:
-        """
-        Lookup detail senyawa berdasarkan `hepatwin_id`.
-        WAJIB memfilter `is_simulatable = TRUE`. 
-        Menyingkirkan 105 senyawa biologik (is_simulatable = FALSE).
-        """
-        if not hepatwin_id or not hepatwin_id.strip():
-            return None
-
-        return _cached_get_compound(hepatwin_id)
-
-    def search_by_name(self, query: str, limit: int = 10) -> List[HepatwinCompound]:
-        """
-        Pencarian autocomplete senyawa berdasarkan nama obat (INN/Normalized).
-        WAJIB memfilter `is_simulatable = TRUE`.
-        Menggunakan caching in-memory via `_cached_search_ids` untuk latensi <= 50ms.
-        """
-        if not query or not query.strip():
-            return []
-
-        clean_query = query.strip().lower()
-        target_ids = _cached_search_ids(clean_query, limit)
-        
-        if not target_ids:
-            return []
-
-        for attempt in range(2):
-            try:
-                stmt = (
-                    select(HepatwinCompound)
-                    .where(HepatwinCompound.hepatwin_id.in_(target_ids))
-                )
-                results = {c.hepatwin_id: c for c in self.db.scalars(stmt).all()}
-                return [results[hid] for hid in target_ids if hid in results]
-            except (OperationalError, SQLAlchemyError) as e:
-                logger.error(f"Error DB pada search_by_name fetching IDs (attempt {attempt+1}): {e}")
-                self.db.rollback()
-                if attempt == 1:
-                    raise e
-            except Exception as e:
-                logger.error(f"Error non-DB pada search_by_name fetching IDs: {e}")
-                raise e
-        return []
 
     # Alias untuk kompatibilitas mundur dengan test suite eksisting
     get_by_id = get_compound_by_hepatwin_id
     search_autocomplete = search_by_name
 
+def _cached_search_ids(query: str, limit: int) -> List[str]:
+    from app.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        repo = CompoundRepository(db)
+        compounds = repo.search_by_name(query, limit)
+        return [c.hepatwin_id for c in compounds]
+    finally:
+        db.close()

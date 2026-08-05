@@ -27,7 +27,7 @@ class AllometricService:
 
         # 2. Pemetaan Jenis Kelamin
         gender_upper = gender.strip().upper()
-        if gender_upper in ["MALE", "M", "L", "LAKI-LAKI", "LAKI"]:
+        if gender_upper in ["MALE", "M", "L", "LAKI-LAKI", "LAKI", "PRIA"]:
             sex_val = 1
         elif gender_upper in ["FEMALE", "F", "P", "PEREMPUAN", "WANITA"]:
             sex_val = 0

@@ -40,7 +40,7 @@ class AutocompleteResponse(BaseModel):
 # --- DTO Request & Response Simulasi PRD v2.0 ---
 
 class PatientCovariates(BaseModel):
-    usia: int = Field(..., ge=1, le=120, description="Usia pasien dalam tahun")
+    usia: int = Field(..., ge=0, le=120, description="Usia pasien dalam tahun (0-120)")
     jenis_kelamin: Literal["L", "P"] = Field(..., description="Jenis kelamin pasien (L = Laki-laki, P = Perempuan)")
     berat_badan_kg: float = Field(..., ge=1.0, le=350.0, description="Berat badan pasien dalam kg")
     tinggi_badan_cm: float = Field(..., ge=30.0, le=250.0, description="Tinggi badan pasien dalam cm")

@@ -232,6 +232,9 @@ def setup_database():
     original_session_local = db_module.SessionLocal
     db_module.SessionLocal = TestingSessionLocal
     
+    from app.repositories.compound_repository import clear_caches
+    clear_caches()
+    
     yield
     
     # Revert patch

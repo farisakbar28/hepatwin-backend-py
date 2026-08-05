@@ -7,11 +7,19 @@ from app.core.database import get_db
 
 client = TestClient(app)
 
-def mock_get_db():
-    db = MagicMock()
-    yield db
+@pytest.fixture(autouse=True)
+def override_db_for_unit_tests():
+    def mock_get_db():
+        db = MagicMock()
+        yield db
 
-app.dependency_overrides[get_db] = mock_get_db
+    orig_override = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = mock_get_db
+    yield
+    if orig_override is not None:
+        app.dependency_overrides[get_db] = orig_override
+    else:
+        app.dependency_overrides.pop(get_db, None)
 
 def test_health_check():
     response = client.get("/health")
