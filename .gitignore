@@ -127,6 +127,7 @@ ml/models/
 # C2/C5 provenance seals: committed on purpose so git history proves the
 # featurization snapshot and train/val/test split were not altered after the fact
 !ml/data/interim/compounds_snapshot.parquet
+!ml/data/interim/compounds_snapshot.meta.json
 !ml/data/interim/split_manifest.json
 
 # Model weights are ignored by default, except the final artifacts served by app/
