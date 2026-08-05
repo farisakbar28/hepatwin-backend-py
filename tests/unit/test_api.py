@@ -11,7 +11,22 @@ def mock_get_db():
     db = MagicMock()
     yield db
 
-app.dependency_overrides[get_db] = mock_get_db
+@pytest.fixture(autouse=True)
+def _override_get_db():
+    """Scoped ke tiap test di modul ini -- override sebelumnya (mis. SQLite
+    seed dari tests/conftest.py) dipulihkan setelahnya. Sebelumnya baris ini
+    adalah kode top-level yang jalan sekali saat modul di-import (collection
+    time), menimpa app.dependency_overrides[get_db] secara global untuk
+    SISA seluruh sesi pytest -- termasuk test e2e/security yang di-collect
+    setelah modul ini, membuatnya memakai MagicMock alih-alih SQLite seed
+    dan gagal massal saat `pytest tests/` dijalankan utuh."""
+    previous = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = mock_get_db
+    yield
+    if previous is not None:
+        app.dependency_overrides[get_db] = previous
+    else:
+        app.dependency_overrides.pop(get_db, None)
 
 def test_health_check():
     response = client.get("/health")
