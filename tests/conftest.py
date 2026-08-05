@@ -158,6 +158,24 @@ def seed_database(db: Session):
             canonical_smiles="CN(C)C1=C(C=CC2=C1C(C3CC4C(C(=O)C(=C(C4(C(=O)C3=C2O)O)O)C(=O)N)N(C)C)O)O", injury_pattern="Mixed",
             segment_list="I, II, III, IV, V, VI, VII, VIII"
         ),
+        # --- C11: senyawa sintetis untuk edge case (bukan data DILIrank nyata,
+        # tidak pernah terjadi di 1231 simulatable asli -- C2 sudah
+        # memverifikasi 0 gagal parse di korpus nyata). Murni menguji jalur
+        # defensif ai_engine.py saat data tidak terduga sampai ke sana. ---
+        HepatwinCompound(
+            hepatwin_id="HT-C11-INVALID-SMILES", ltkb_id="LTKB-C11-01",
+            compound_name="C11 Test Invalid SMILES", compound_name_normalized="c11 test invalid smiles",
+            dili_concern="Less-DILI-Concern", is_simulatable=True,
+            canonical_smiles="INVALID_NOT_A_REAL_SMILES_XYZ123", injury_pattern="Mixed",
+            segment_list="I, II"
+        ),
+        HepatwinCompound(
+            hepatwin_id="HT-C11-SALT", ltkb_id="LTKB-C11-02",
+            compound_name="C11 Test Salt Compound", compound_name_normalized="c11 test salt compound",
+            dili_concern="Less-DILI-Concern", is_simulatable=True,
+            canonical_smiles="CC(C)Cc1ccc(cc1)C(C)C(=O)O.[Na+]", injury_pattern="Mixed",
+            segment_list="I, II"
+        ),
         # --- BIOLOGICS (is_simulatable = False) ---
         HepatwinCompound(
             hepatwin_id="HT-BIOLOGIC-001", ltkb_id="LTKB-B001",
