@@ -1,0 +1,93 @@
+{
+  "model_version": "gatnn-dnn-fixmodel-v1",
+  "architecture": "GATv2Conv x2 (heads=4, edge_dim=6) + DNN(1200->512->128) -> fusion(384->128->1), logit",
+  "hyperparameters": {
+    "lr": 0.0005,
+    "hidden": 64,
+    "dropout": 0.2,
+    "weight_decay": 0.0001,
+    "batch_size": 32,
+    "max_epochs": 300,
+    "patience": 30,
+    "optimizer": "AdamW",
+    "scheduler": "ReduceLROnPlateau(mode=max, factor=0.5, patience=10)",
+    "loss": "BCEWithLogitsLoss(pos_weight=from train fold only)"
+  },
+  "hyperparameter_provenance": "nested CV 10-fold, branch upscale, ml/reports/_upscale_archive/22_final_holdout_eval.json -- TIDAK dicari ulang",
+  "production_seed": 42,
+  "n_train": 580,
+  "n_val": 116,
+  "trained_at_utc": "2026-08-05T10:25:10.636412+00:00",
+  "split_manifest_sha256": "fac7e9c3e28a95f79177806e09c682056ab1205bde5c3c39e345f8d79aa48a04",
+  "checkpoint_selection": "val_auc terbaik selama training (bukan epoch terakhir)",
+  "val_metrics_production_seed": {
+    "auc_roc": 0.6624839124839125,
+    "auc_pr": 0.7201977810298035,
+    "accuracy": 0.6810344827586207,
+    "sensitivity": 0.7567567567567568,
+    "specificity": 0.5476190476190477,
+    "precision": 0.7466666666666667,
+    "f1": 0.7516778523489933,
+    "mcc": 0.3060046819023892,
+    "brier": 0.2173290856466028,
+    "ece": 0.10484043251851509,
+    "seed": 42,
+    "train_seconds": 15.0
+  },
+  "val_metrics_across_5_seeds_mean_std": {
+    "auc_roc": [
+      0.6585585585585585,
+      0.002916414206853173
+    ],
+    "auc_pr": [
+      0.7280824868810164,
+      0.006735992152019959
+    ],
+    "accuracy": [
+      0.6,
+      0.067351810291809
+    ],
+    "sensitivity": [
+      0.5594594594594595,
+      0.1501399395927692
+    ],
+    "specificity": [
+      0.6714285714285714,
+      0.08164965809277258
+    ],
+    "precision": [
+      0.7476751700680272,
+      0.01615894681939389
+    ],
+    "f1": [
+      0.6288913536423208,
+      0.10894045492317903
+    ],
+    "mcc": [
+      0.22763315334738182,
+      0.06918793757562557
+    ],
+    "brier": [
+      0.2330303631530659,
+      0.013068272891548261
+    ],
+    "ece": [
+      0.15237213290970902,
+      0.04021297327187896
+    ],
+    "seed": [
+      44.0,
+      1.4142135623730951
+    ],
+    "train_seconds": [
+      15.24,
+      0.1743559577416271
+    ]
+  },
+  "determinism_check": {
+    "repeat_seed": 42,
+    "auc_roc_original": 0.6624839124839125,
+    "auc_roc_repeat": 0.6624839124839125,
+    "identical": true
+  }
+}
