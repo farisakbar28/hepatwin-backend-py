@@ -1,4 +1,8 @@
+import logging
 from typing import Dict, Any
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class AllometricService:
     """
@@ -16,9 +20,12 @@ class AllometricService:
         gender: str,
         weight_kg: float,
         height_cm: float,
-        base_cl_metabolism_l_hr: float = 15.0,  # Nilai default atau dari deskriptor senyawa
+        base_cl_metabolism_l_hr: float = None,  # Nilai default atau dari deskriptor senyawa
         xlogp: float = None
     ) -> Dict[str, Any]:
+        if base_cl_metabolism_l_hr is None:
+            base_cl_metabolism_l_hr = settings.base_cl_metabolism_l_hr
+            
         if weight_kg <= 0.0 or height_cm <= 0.0:
             raise ValueError("Parameter berat dan tinggi badan harus lebih besar dari 0.")
 
@@ -39,13 +46,14 @@ class AllometricService:
         body_fat_pct = max(0.0, 1.20 * bmi + 0.23 * float(age) - 10.8 * sex_val - 5.4)
 
         # 4. Volume Kompartemen (L) - Penskalaan proporsional berat tubuh
-        v_liver = 0.025 * weight_kg       # V_L: 2.5% dari berat badan (Brown et al. 1997)
+        v_liver = settings.V_L_frac * weight_kg       # V_L: 2.5% dari berat badan (Brown et al. 1997) [ASUMSI DESAIN minor]
         v_plasma = 0.040 * weight_kg      # V_P: 4.0% dari berat badan (Sirkulasi plasma)
         v_kidney = 0.004 * weight_kg      # V_K: 0.4% dari berat badan
         v_remainder = weight_kg - (v_liver + v_plasma + v_kidney) # V_R: Sisa tubuh
 
-        # 5. Laju Aliran Darah Hepatik Q_L (Soejima et al. 2022)
-        q_l_base = 1.35 * ((weight_kg / 70.0) ** 0.75)  # Aliran baseline berskala alometrik
+        # 5. Laju Aliran Darah Hepatik Q_L 
+        # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik 1.35 (ekuivalen 81 L/h, bukan 90 absolut) (Soejima et al. 2022)
+        q_l_base = settings.Q_L_baseline * ((weight_kg / 70.0) ** 0.75)  # Aliran baseline berskala alometrik
         if age >= 40:
             # Penurunan 0.8% (0.008) per tahun setelah umur 40 tahun
             age_factor = max(0.20, 1.0 - 0.008 * (float(age) - 40.0))  # Floor 20% agar tidak negatif
@@ -57,7 +65,8 @@ class AllometricService:
         q_kidney = 1.10 * ((weight_kg / 70.0) ** 0.75)
         q_remainder = 3.00 * ((weight_kg / 70.0) ** 0.75)
 
-        # 6. Klirens Metabolisme Hepatik (Cl_metabolisme) & Koreksi Obesitas MASLD (Ghabril et al. 2025)
+        # 6. Klirens Metabolisme Hepatik (Cl_metabolisme) & Koreksi Obesitas MASLD
+        # [ASUMSI DESAIN -- PENDING FARMASI] Ghabril et al. 2025 tidak merekomendasikan ambang statis 20%
         cl_scaled = base_cl_metabolism_l_hr * ((weight_kg / 70.0) ** 0.75)
         if bmi >= 30.0:
             # Reduksi otomatis 20% pada BMI >= 30 akibat perlemakan hati kronis
@@ -68,8 +77,15 @@ class AllometricService:
         cl_renal = 2.0 * ((weight_kg / 70.0) ** 0.75)
 
         # Formula penyesuaian koefisien partisi jaringan sisa (lipofilik)
-        if xlogp is not None and xlogp > 0:
-            kp_r = 1.0 + (body_fat_pct / 100.0) * (10 ** (0.5 * xlogp))
+        if xlogp is None:
+            logger.warning("[FALLBACK XLogP NULL hepatwin_id=... S5-SwissADME → 0]")
+            xlogp = 0.0
+            
+        if xlogp > 0:
+            kp_r_raw = 1.0 + (body_fat_pct / 100.0) * (10 ** (0.5 * xlogp))
+            kp_r = min(max(kp_r_raw, 0.5), 10.0)  # clamp S3 Coutinho 2024
+            # [ASUMSI DESAIN Kp_R -- PENDING K3/FARMASI]
+            # S3 Coutinho overpredict 69x
         else:
             kp_r = 1.0
 
