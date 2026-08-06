@@ -16,7 +16,8 @@ class AllometricService:
         gender: str,
         weight_kg: float,
         height_cm: float,
-        base_cl_metabolism_l_hr: float = 15.0  # Nilai default atau dari deskriptor senyawa
+        base_cl_metabolism_l_hr: float = 15.0,  # Nilai default atau dari deskriptor senyawa
+        xlogp: float = None
     ) -> Dict[str, Any]:
         if weight_kg <= 0.0 or height_cm <= 0.0:
             raise ValueError("Parameter berat dan tinggi badan harus lebih besar dari 0.")
@@ -66,6 +67,12 @@ class AllometricService:
 
         cl_renal = 2.0 * ((weight_kg / 70.0) ** 0.75)
 
+        # Formula penyesuaian koefisien partisi jaringan sisa (lipofilik)
+        if xlogp is not None and xlogp > 0:
+            kp_r = 1.0 + (body_fat_pct / 100.0) * (10 ** (0.5 * xlogp))
+        else:
+            kp_r = 1.0
+
         return {
             "bmi": round(bmi, 2),
             "body_fat_pct": round(body_fat_pct, 2),
@@ -80,5 +87,5 @@ class AllometricService:
             "Cl_renal": round(cl_renal, 4),
             "K_P_L": 5.0,  # Koefisien partisi jaringan-terhadap-plasma standar
             "K_P_K": 2.0,
-            "K_P_R": 1.0
+            "K_P_R": round(kp_r, 4)
         }

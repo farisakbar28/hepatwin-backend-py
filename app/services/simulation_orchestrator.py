@@ -62,7 +62,8 @@ class SimulationOrchestrator:
             cov.usia,
             cov.jenis_kelamin,
             cov.berat_badan_kg,
-            cov.tinggi_badan_cm
+            cov.tinggi_badan_cm,
+            compound.xlogp
         )
 
         # Tunggu luaran kedua mesin secara asinkron

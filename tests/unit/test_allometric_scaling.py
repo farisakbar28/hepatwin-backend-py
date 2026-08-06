@@ -59,3 +59,27 @@ def test_invalid_gender_raises_error():
 def test_premature_baby_body_fat_is_zero():
     params = AllometricService.calculate_physiological_parameters(0, "M", 2.0, 45.0)
     assert params["body_fat_pct"] == 0.0
+
+def test_lipophilic_drug_kp_r_correction():
+    # Test with no xlogp
+    params_none = AllometricService.calculate_physiological_parameters(30, "MALE", 70.0, 175.0, xlogp=None)
+    assert params_none["K_P_R"] == 1.0
+
+    # Test with negative xlogp (not lipophilic)
+    params_neg = AllometricService.calculate_physiological_parameters(30, "MALE", 70.0, 175.0, xlogp=-1.5)
+    assert params_neg["K_P_R"] == 1.0
+
+    # Test with positive xlogp (lipophilic)
+    xlogp_val = 2.0
+    params_pos = AllometricService.calculate_physiological_parameters(30, "MALE", 70.0, 175.0, xlogp=xlogp_val)
+    
+    # Recalculate expected value without rounding differences
+    expected_bmi = 70.0 / (1.75 ** 2)
+    expected_bf = max(0.0, 1.20 * expected_bmi + 0.23 * 30 - 10.8 * 1 - 5.4)
+    expected_kp_r = 1.0 + (expected_bf / 100.0) * (10 ** (0.5 * xlogp_val))
+    assert params_pos["K_P_R"] == round(expected_kp_r, 4)
+
+    # Test difference between Male and Female for lipophilic drug
+    params_female = AllometricService.calculate_physiological_parameters(30, "FEMALE", 70.0, 175.0, xlogp=xlogp_val)
+    # Female has higher %BF, so K_P_R should be higher
+    assert params_female["K_P_R"] > params_pos["K_P_R"]

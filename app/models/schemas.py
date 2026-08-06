@@ -19,7 +19,7 @@ class CompoundDetail(CompoundItem):
     molecular_weight: Optional[float] = Field(None)
     tpsa: Optional[float] = Field(None)
     xlogp: Optional[float] = Field(None)
-    iupac_name: Optional[str] = Field(None)
+
     heavy_atom_count: Optional[int] = Field(None)
     hydrogen_bond_donor_count: Optional[int] = Field(None)
     hydrogen_bond_acceptor_count: Optional[int] = Field(None)

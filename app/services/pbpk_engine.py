@@ -61,7 +61,7 @@ class PBPKEngine:
     def __init__(self):
         logger.info("PBPKEngine initialized.")
         # Mode 4 Remediation: Pre-warm CPU cache solver for test baseline (Age 45, Male, 75kg, 175cm)
-        self._simulate_base(45, "Laki-Laki", 75.0, 175.0, 24.0, 0.1)
+        self._simulate_base(45, "Laki-Laki", 75.0, 175.0, None, 24.0, 0.1)
 
     def _verify_mass_balance(self, sol_y: np.ndarray, params: Dict[str, float], dosis_mg: float) -> None:
         """
@@ -102,10 +102,11 @@ class PBPKEngine:
         jenis_kelamin: str, 
         berat_badan_kg: float, 
         tinggi_badan_cm: float,
+        xlogp: float,
         duration_hours: float,
         step_hours: float
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, float]]:
-        params = AllometricService.calculate_physiological_parameters(usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm)
+        params = AllometricService.calculate_physiological_parameters(usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm, xlogp=xlogp)
         
         # Simulasi selalu dijalankan untuk basis dosis 1.0 mg
         dosis_base = 1.0
@@ -144,12 +145,13 @@ class PBPKEngine:
         jenis_kelamin: str, 
         berat_badan_kg: float, 
         tinggi_badan_cm: float,
+        xlogp: float = None,
         duration_hours: float = 24.0,
         step_hours: float = 0.1
     ) -> Tuple[List[Dict[str, float]], float, float]:
         # Mode 4 Remediation: Linear ODE Scaling & LRU Cache untuk kecepatan < 100ms dengan RK45 murni
         t_arr, sol_y_base, params = self._simulate_base(
-            usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm, duration_hours, step_hours
+            usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm, xlogp, duration_hours, step_hours
         )
         
         # Skalakan hasil dari dosis_base 1.0 ke dosis_mg secara linear
