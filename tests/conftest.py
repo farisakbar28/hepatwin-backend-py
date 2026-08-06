@@ -180,6 +180,48 @@ def seed_database(db: Session):
             canonical_smiles="CC(C)Cc1ccc(cc1)C(C)C(=O)O.[Na+]", injury_pattern="Mixed",
             segment_list="I;II"
         ),
+        # --- F8: fixture khusus utk test_d9_fusion_e2e.py ---
+        # Pola cedera & intensitas hotspot memakai label Indonesia (sesuai data
+        # Supabase nyata, F4) -- BEDA sengaja dari HT-001..HT-020 di atas yang
+        # memakai label Inggris lama (diverifikasi tests/e2e/test_b7_lookup_e2e.py
+        # sudah menguncinya, TIDAK diubah di sini utk menghindari regresi).
+        HepatwinCompound(
+            hepatwin_id="HT-HEPATOSELULER-TEST", ltkb_id="LTKB-F8-01", cid=1983,
+            compound_name="F8 Test Hepatoseluler", compound_name_normalized="f8 test hepatoseluler",
+            dili_concern="Most-DILI-concern", is_simulatable=True,
+            canonical_smiles="CC(=O)NC1=CC=C(O)C=C1", injury_pattern="Hepatoseluler",
+            segment_list="V;VI;VII;VIII", hotspot_base_intensity="high", hotspot_display_mode="focal",
+        ),
+        HepatwinCompound(
+            hepatwin_id="HT-UNCLASSIFIED-SAME-SMILES", ltkb_id="LTKB-F8-02", cid=1983,
+            compound_name="F8 Test Unclassified (SMILES identik dgn HT-HEPATOSELULER-TEST)",
+            compound_name_normalized="f8 test unclassified",
+            dili_concern="Most-DILI-concern", is_simulatable=True,
+            # SMILES SENGAJA SAMA dgn HT-HEPATOSELULER-TEST -- dili_score dijamin
+            # identik (model deterministik), sehingga AI band & visual_color
+            # HARUS sama; hanya hotspot_intensity/mode yang beda (test #9 F8).
+            canonical_smiles="CC(=O)NC1=CC=C(O)C=C1", injury_pattern="Tidak Terklasifikasi",
+            segment_list=None, hotspot_base_intensity=None, hotspot_display_mode=None,
+        ),
+        HepatwinCompound(
+            hepatwin_id="HT-VNO-SAFE-TEST", ltkb_id="LTKB-F8-03", cid=1080,
+            compound_name="F8 Test vNo Safe (Calcitonin salmon, skor terendah katalog nyata)",
+            compound_name_normalized="f8 test vno safe",
+            dili_concern="No-DILI-concern", is_simulatable=True,
+            # SMILES nyata Calcitonin salmon (HT0178 Supabase) -- skor terendah
+            # terukur di seluruh katalog 1.231 senyawa (F1: 0.5078), dipakai
+            # utk membuktikan band AI_LOW benar-benar tercapai pada senyawa asli.
+            canonical_smiles=(
+                "CC(C)CC1C(=O)NC(C(=O)NC(C(=O)NC(CSSCC(C(=O)NC(C(=O)NC(C(=O)N1)CC(=O)N)CO)N)"
+                "C(=O)NC(C(C)C)C(=O)NC(CC(C)C)C(=O)NCC(=O)NC(CCCCN)C(=O)NC(CC(C)C)C(=O)NC(CO)"
+                "C(=O)NC(CCC(=O)N)C(=O)NC(CCC(=O)O)C(=O)NC(CC(C)C)C(=O)NC(CC2=CN=CN2)C(=O)NC(CCCCN)"
+                "C(=O)NC(CC(C)C)C(=O)NC(CCC(=O)N)C(=O)NC(C(C)O)C(=O)NC(CC3=CC=C(C=C3)O)"
+                "C(=O)N4CCCC4C(=O)NC(CCCNC(=N)N)C(=O)NC(C(C)O)C(=O)NC(CC(=O)N)C(=O)NC(C(C)O)"
+                "C(=O)NCC(=O)NC(CO)C(=O)NCC(=O)NC(C(C)O)C(=O)N5CCCC5C(=O)N)C(C)O)CO"
+            ),
+            injury_pattern="Tidak Terklasifikasi", segment_list=None,
+            hotspot_base_intensity=None, hotspot_display_mode=None,
+        ),
         # --- BIOLOGICS (is_simulatable = False) ---
         HepatwinCompound(
             hepatwin_id="HT-BIOLOGIC-001", ltkb_id="LTKB-B001",
