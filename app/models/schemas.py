@@ -46,6 +46,10 @@ class TimeSeriesPBPKPoint(BaseModel):
     c_plasma: float = Field(..., description="Konsentrasi plasma (mg/L)")
     c_hati: float = Field(..., description="Konsentrasi hati (mg/L)")
 
+class FusionThresholds(BaseModel):
+    t_low: float = Field(..., description="Ambang dili_score band AI_LOW/AI_MID (F2, gerbang K2)")
+    t_high: float = Field(..., description="Ambang dili_score band AI_MID/AI_HIGH (F2, gerbang K2)")
+
 class SimulationResponse(BaseModel):
     hepatwin_id: str = Field(..., description="Identifier senyawa")
     compound_name: str = Field(..., description="Nama resmi senyawa (INN)")
@@ -85,3 +89,12 @@ class SimulationResponse(BaseModel):
         None, description="Status model AI -- mencegah kebingungan model asli vs tidak ada"
     )
     score_is_calibrated: Optional[bool] = Field(None, description="True bila dili_score sudah melalui kalibrator (C7)")
+
+    # --- F7 (gerbang K4, PROJECT_FUSION.md): perluasan kontrak backward-compatible ---
+    fusion_reason: str = Field(..., description="Sel matriks fusi yang terpakai, mis. 'AI_MID x LOW_EXPOSURE' (F3)")
+    exposure_category: str = Field(..., description="LOW_EXPOSURE, MODERATE_EXPOSURE, atau HIGH_EXPOSURE (F3/exposure_evaluator)")
+    thresholds_used: FusionThresholds = Field(..., description="Ambang T_low/T_high yang dipakai band AI pada simulasi ini (F2), utk transparansi/audit")
+    timing_ms: Optional[Dict[str, float]] = Field(
+        None,
+        description="Durasi per-tahap (ms) -- HANYA terisi bila settings.DEBUG aktif (F6); null di produksi",
+    )

@@ -10,7 +10,7 @@ from app.services.ai_engine import HybridAIEngine
 from app.services.pbpk_engine import PBPKEngine
 from app.services.exposure_evaluator import ExposureEvaluatorService
 from app.services.fusion_service import FusionService
-from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint
+from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint, FusionThresholds
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -214,4 +214,8 @@ class SimulationOrchestrator:
             model_version=self.ai_engine.model_version,
             model_status=self.ai_engine.model_status,
             score_is_calibrated=self.ai_engine.score_is_calibrated,
+            fusion_reason=fusion_result.fusion_reason,
+            exposure_category=exposure_result["risk_level"],
+            thresholds_used=FusionThresholds(t_low=settings.FUSION_AI_T_LOW, t_high=settings.FUSION_AI_T_HIGH),
+            timing_ms=timing_ms if settings.DEBUG else None,
         )
