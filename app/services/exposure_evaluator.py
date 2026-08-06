@@ -1,5 +1,8 @@
 from enum import Enum
 from typing import Dict, Any
+from app.core.config import settings
+
+USE_CANDIDATE_K3 = False
 
 class ExposureRiskLevel(str, Enum):
     LOW = "LOW_EXPOSURE"
@@ -36,15 +39,17 @@ class ExposureEvaluatorService:
         has_vulnerability_modifier = (age >= 60) or (bmi >= 30.0)
         
         # Penyesuaian ambang dinamis
-        high_threshold = 0.35 if has_vulnerability_modifier else 0.40
-        moderate_threshold = 0.20 if has_vulnerability_modifier else 0.30
+        # [ASUMSI DESAIN -- PENDING K3] 0.40/0.35/0.30/0.20
+        high_threshold = settings.RATIO_HIGH_MODIFIER if has_vulnerability_modifier else settings.RATIO_HIGH_NORMAL
+        moderate_threshold = settings.RATIO_MODERATE_MODIFIER if has_vulnerability_modifier else settings.RATIO_MODERATE_NORMAL
 
         # 4. Logika Evaluasi Seragam (Tanpa perbandingan terhadap ambang mg/L literatur)
         # Kriteria relatif empiris yang seragam untuk seluruh senyawa simulatable:
-        if dose_per_kg >= 30.0 or cmax_auc_ratio > high_threshold:
+        # [ASUMSI DESAIN -- PENDING K3] 30/10
+        if dose_per_kg >= settings.DOSE_HIGH_THRESHOLD or cmax_auc_ratio > high_threshold:
             risk_level = ExposureRiskLevel.HIGH
             risk_score = 0.85
-        elif dose_per_kg >= 10.0 or cmax_auc_ratio > moderate_threshold:
+        elif dose_per_kg >= settings.DOSE_MODERATE_THRESHOLD or cmax_auc_ratio > moderate_threshold:
             risk_level = ExposureRiskLevel.MODERATE
             risk_score = 0.50
         else:
