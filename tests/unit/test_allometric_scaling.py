@@ -83,3 +83,16 @@ def test_lipophilic_drug_kp_r_correction():
     params_female = AllometricService.calculate_physiological_parameters(30, "FEMALE", 70.0, 175.0, xlogp=xlogp_val)
     # Female has higher %BF, so K_P_R should be higher
     assert params_female["K_P_R"] > params_pos["K_P_R"]
+
+def test_kp_r_null_xlogp():
+    params = AllometricService.calculate_physiological_parameters(30, "MALE", 70.0, 175.0, xlogp=None)
+    assert params["K_P_R"] == 1.0
+
+def test_kp_r_negative_xlogp():
+    params = AllometricService.calculate_physiological_parameters(30, "MALE", 70.0, 175.0, xlogp=-2.0)
+    assert params["K_P_R"] == 1.0
+
+def test_kp_r_extreme_xlogp5_clamped():
+    params = AllometricService.calculate_physiological_parameters(30, "MALE", 70.0, 175.0, xlogp=5.0)
+    assert params["K_P_R"] <= 10.0
+
