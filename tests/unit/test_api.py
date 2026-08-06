@@ -8,12 +8,6 @@ from app.core.database import get_db
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
-def override_db_for_unit_tests():
-    def mock_get_db():
-        db = MagicMock()
-        yield db
-
-@pytest.fixture(autouse=True)
 def _override_get_db():
     """Scoped ke tiap test di modul ini -- override sebelumnya (mis. SQLite
     seed dari tests/conftest.py) dipulihkan setelahnya. Sebelumnya baris ini
@@ -22,6 +16,10 @@ def _override_get_db():
     SISA seluruh sesi pytest -- termasuk test e2e/security yang di-collect
     setelah modul ini, membuatnya memakai MagicMock alih-alih SQLite seed
     dan gagal massal saat `pytest tests/` dijalankan utuh."""
+    def mock_get_db():
+        db = MagicMock()
+        yield db
+
     previous = app.dependency_overrides.get(get_db)
     app.dependency_overrides[get_db] = mock_get_db
     yield
