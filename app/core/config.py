@@ -20,6 +20,19 @@ class Settings(BaseSettings):
     # [KEPUTUSAN AI -- PENDING REVIEW FARMASI + KETUA TIM, gerbang K2]
     FUSION_AI_T_LOW: float = 0.5458
     FUSION_AI_T_HIGH: float = 0.6866
+
+    # F5 (gerbang K3, PROJECT_FUSION.md SS3.5) -- enam ambang exposure_evaluator.
+    # [ASUMSI DESAIN -- PENDING REVIEW FARMASI, gerbang K3] Soejima et al. (2022)
+    # & Ghabril et al. (2025) mendukung KEBERADAAN modifikator usia>=60/BMI>=30;
+    # KEENAM NILAI di bawah TIDAK bersitasi -- dipertahankan apa adanya per
+    # keputusan default K3 (PROJECT_FUSION.md SS6), dipindah ke config supaya
+    # Farmasi bisa merevisi tanpa menyentuh logika exposure_evaluator.py.
+    EXPOSURE_DOSE_HIGH_MG_PER_KG: float = 30.0
+    EXPOSURE_DOSE_MODERATE_MG_PER_KG: float = 10.0
+    EXPOSURE_RATIO_HIGH_THRESHOLD: float = 0.40
+    EXPOSURE_RATIO_HIGH_THRESHOLD_VULNERABLE: float = 0.35
+    EXPOSURE_RATIO_MODERATE_THRESHOLD: float = 0.30
+    EXPOSURE_RATIO_MODERATE_THRESHOLD_VULNERABLE: float = 0.20
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
