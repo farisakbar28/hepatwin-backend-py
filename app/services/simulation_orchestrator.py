@@ -1,6 +1,7 @@
 import logging
 import asyncio
-from typing import List, Dict, Any
+import time
+from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.domain import HepatwinCompound
@@ -14,16 +15,39 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _timed(fn, *args):
+    """F6 (D7): jalankan `fn(*args)` di thread executor, ukur durasinya
+    sendiri (bukan dari sisi caller) -- caller hanya melihat waktu
+    `await`, bukan waktu eksekusi murni di thread pekerja."""
+    start = time.perf_counter()
+    result = fn(*args)
+    return result, time.perf_counter() - start
+
+
 class SimulationOrchestrator:
     def __init__(self):
         self.ai_engine = HybridAIEngine(model_path=settings.AI_MODEL_PATH)
         self.pbpk_engine = PBPKEngine()
 
-    async def handle_simulation(self, request: SimulationRequest, db: Session) -> SimulationResponse:
+    async def handle_simulation(
+        self, request: SimulationRequest, db: Session,
+        timing_sink: Optional[Dict[str, float]] = None,
+    ) -> SimulationResponse:
+        """
+        `timing_sink` (F6, D7): dict opsional yang diisi durasi per-tahap
+        (ms) bila disediakan pemanggil -- dipakai skrip benchmark/test, TIDAK
+        pernah otomatis masuk response body (lihat F7 utk `timing_ms`
+        tergerbang `settings.DEBUG`). Selalu di-log server-side lewat
+        `logger.info` terlepas dari `timing_sink`.
+        """
+        t_start = time.perf_counter()
+
         # 1. Lookup Senyawa di Database (OFFLINE & DETERMINISTIK)
         repo = CompoundRepository(db)
         compound = repo.get_by_id(request.hepatwin_id)
-        
+        t_lookup_done = time.perf_counter()
+
         if not compound:
             raise HTTPException(
                 status_code=404,
@@ -44,6 +68,7 @@ class SimulationOrchestrator:
         # Task A: AI Predictor (PyTorch GATNN-DNN + SHAP)
         ai_task = loop.run_in_executor(
             None,
+            _timed,
             self.ai_engine.predict_dili_risk,
             smiles
         )
@@ -54,6 +79,7 @@ class SimulationOrchestrator:
         # dari shap_detail["groups"] di bawah, satu sumber komputasi.
         shap_task = loop.run_in_executor(
             None,
+            _timed,
             self.ai_engine.get_shap_detail,
             smiles
         )
@@ -62,6 +88,7 @@ class SimulationOrchestrator:
         cov = request.covariates
         pbpk_task = loop.run_in_executor(
             None,
+            _timed,
             self.pbpk_engine.simulate,
             request.dosis_mg,
             cov.usia,
@@ -71,15 +98,18 @@ class SimulationOrchestrator:
         )
 
         # Tunggu luaran kedua mesin secara asinkron
-        dili_score, shap_detail, (time_series_data, cmax_hati, auc_hati) = await asyncio.gather(
+        t_parallel_start = time.perf_counter()
+        (dili_score, t_ai), (shap_detail, t_shap), ((time_series_data, cmax_hati, auc_hati), t_pbpk) = await asyncio.gather(
             ai_task, shap_task, pbpk_task
         )
+        t_parallel_wall = time.perf_counter() - t_parallel_start
         explainability_shap = [g["name"] for g in shap_detail["groups"]]
 
         # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
         # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
         bmi = cov.berat_badan_kg / ((cov.tinggi_badan_cm/100)**2)
-        
+
+        t_exposure_start = time.perf_counter()
         exposure_result = ExposureEvaluatorService.evaluate_relative_exposure(
             cmax=cmax_hati,
             auc=auc_hati,
@@ -88,11 +118,14 @@ class SimulationOrchestrator:
             dose_mg=request.dosis_mg,
             weight_kg=cov.berat_badan_kg
         )
-        
+        t_exposure = time.perf_counter() - t_exposure_start
+
+        t_fusion_start = time.perf_counter()
         fusion_result = FusionService.determine_visual_status(
             dili_score=dili_score,
             exposure_category=exposure_result["risk_level"]
         )
+        t_fusion = time.perf_counter() - t_fusion_start
         risk_level, visual_color, blinking_speed = (
             fusion_result.risk_level, fusion_result.visual_color, fusion_result.blinking_speed
         )
@@ -125,7 +158,7 @@ class SimulationOrchestrator:
             if is_evidence_fallback else None
         )
 
-        # C. Format Time Series Data
+        # D. Format Time Series Data
         ts_points = [
             TimeSeriesPBPKPoint(
                 time=pt["time"],
@@ -141,6 +174,24 @@ class SimulationOrchestrator:
             "triase skrining awal, BUKAN diagnosis klinis, keputusan medis, atau pengganti mutlak bagi pengujian in vitro / in vivo. "
             "Seluruh kalkulasi beroperasi pada tingkat Context of Use berisiko rendah berdasarkan standar ASME V&V 40 (2018)."
         )
+
+        # E. Instrumentasi latensi per-tahap (F6, D7) -- server-side saja,
+        # TIDAK pernah otomatis masuk response body (lihat F7 utk timing_ms
+        # tergerbang settings.DEBUG).
+        t_total = time.perf_counter() - t_start
+        timing_ms = {
+            "lookup_ms": round((t_lookup_done - t_start) * 1000, 2),
+            "ai_inference_ms": round(t_ai * 1000, 2),
+            "shap_ms": round(t_shap * 1000, 2),
+            "pbpk_ms": round(t_pbpk * 1000, 2),
+            "parallel_wall_ms": round(t_parallel_wall * 1000, 2),
+            "exposure_eval_ms": round(t_exposure * 1000, 2),
+            "fusion_ms": round(t_fusion * 1000, 2),
+            "total_ms": round(t_total * 1000, 2),
+        }
+        logger.info("F6 timing hepatwin_id=%s: %s", compound.hepatwin_id, timing_ms)
+        if timing_sink is not None:
+            timing_sink.update(timing_ms)
 
         return SimulationResponse(
             hepatwin_id=compound.hepatwin_id,
