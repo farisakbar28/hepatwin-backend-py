@@ -56,6 +56,8 @@ class PBPKEngine:
     """
     Mesin Farmakokinetika Mekanistik (PBPK 4-Kompartemen & Penskalaan Alometrik).
     Referensi: PRD v2.0 Bab 8.2 (Brown et al., Deurenberg et al., Soejima et al.).
+    
+    Kondisi awal bolus: C_P(0)=Dosis/V_P, C_L(0)=C_K(0)=C_R(0)=0, units mg/L L/h
     """
     
     def __init__(self):
