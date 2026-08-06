@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     # [ASUMSI DESAIN -- PENDING FARMASI]
     base_cl_metabolism_l_hr: float = 15.0  
 
-    # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik (ekuivalen 81 L/h, bukan 90 absolut)
-    Q_L_baseline: float = 1.35
+    # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik 90.0 L/h
+    Q_L_baseline: float = 90.0
 
     # [ASUMSI DESAIN minor]
     V_L_frac: float = 0.025  

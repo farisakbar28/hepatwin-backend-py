@@ -126,15 +126,7 @@ def get_compound_detail(
             molecular_weight=item.molecular_weight,
             tpsa=item.tpsa,
             xlogp=item.xlogp,
-            iupac_name=item.iupac_name,
-            heavy_atom_count=item.heavy_atom_count,
-            hydrogen_bond_donor_count=item.hydrogen_bond_donor_count,
-            hydrogen_bond_acceptor_count=item.hydrogen_bond_acceptor_count,
-            rotatable_bond_count=item.rotatable_bond_count,
-            exact_mass=item.exact_mass,
-            monoisotopic_mass=item.monoisotopic_mass,
-            charge=item.charge,
-            complexity=item.complexity,
+
             injury_pattern=item.injury_pattern,
             segment_list=item.segment_list,
             hotspot_base_intensity=item.hotspot_base_intensity

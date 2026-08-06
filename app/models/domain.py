@@ -28,14 +28,7 @@ class HepatwinCompound(Base):
     tpsa: Mapped[float | None] = mapped_column(Float, nullable=True)
     xlogp: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    heavy_atom_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    hydrogen_bond_donor_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    hydrogen_bond_acceptor_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    rotatable_bond_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    exact_mass: Mapped[float | None] = mapped_column(Float, nullable=True)
-    monoisotopic_mass: Mapped[float | None] = mapped_column(Float, nullable=True)
-    charge: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    complexity: Mapped[float | None] = mapped_column(Float, nullable=True)
+
 
     livertox_matched: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     livertox_match_method: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -52,7 +52,7 @@ class AllometricService:
         v_remainder = weight_kg - (v_liver + v_plasma + v_kidney) # V_R: Sisa tubuh
 
         # 5. Laju Aliran Darah Hepatik Q_L 
-        # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik 1.35 (ekuivalen 81 L/h, bukan 90 absolut) (Soejima et al. 2022)
+        # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik 90.0 L/h (Soejima et al. 2022)
         q_l_base = settings.Q_L_baseline * ((weight_kg / 70.0) ** 0.75)  # Aliran baseline berskala alometrik
         if age >= 40:
             # Penurunan 0.8% (0.008) per tahun setelah umur 40 tahun

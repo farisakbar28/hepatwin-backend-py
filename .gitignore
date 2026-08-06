@@ -126,10 +126,3 @@ models/
 *.pt
 *.pth
 *.h5
-
-# === LOCAL ONLY - AUDIT DOKS, JANGAN PUSH KE GITHUB ===
-# Laporan audit brutal & checklist Farmasi/Fusion - lokal saja
-/reports/
-report/
-docs/audits/
-docs/
