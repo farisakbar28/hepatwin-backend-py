@@ -13,6 +13,24 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     AI_MODEL_PATH: str = "models/model.pt"
     DEBUG: bool = False
+    
+    # [ASUMSI DESAIN -- PENDING K3] 30/10 & 0.40/0.35/0.30/0.20
+    DOSE_HIGH_THRESHOLD: float = 30.0
+    DOSE_MODERATE_THRESHOLD: float = 10.0
+    RATIO_HIGH_MODIFIER: float = 0.35
+    RATIO_HIGH_NORMAL: float = 0.40
+    RATIO_MODERATE_MODIFIER: float = 0.20
+    RATIO_MODERATE_NORMAL: float = 0.30
+
+    # [ASUMSI DESAIN -- PENDING FARMASI]
+    base_cl_metabolism_l_hr: float = 15.0  
+
+    # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik (ekuivalen 81 L/h, bukan 90 absolut)
+    Q_L_baseline: float = 1.35
+
+    # [ASUMSI DESAIN minor]
+    V_L_frac: float = 0.025  
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
