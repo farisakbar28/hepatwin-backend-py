@@ -55,6 +55,16 @@ class SimulationResponse(BaseModel):
     blinking_speed: Literal["none", "slow", "fast"] = Field(..., description="Kecepatan kedip hotspot WebGL")
     affected_segments: List[str] = Field(..., description="Daftar Segmen Couinaud terdampak (contoh: ['V', 'VI', 'VII', 'VIII'])")
     injury_pattern: str = Field(..., description="Pola cedera: Hepatocellular, Cholestatic, Mixed, atau Fallback/Diffuse")
+
+    # --- F4 (PROJECT_FUSION.md SS4.3): intensitas & mode hotspot dari lookup DB,
+    # TERPISAH dari warna/kedip (yang murni hasil fusi AI+PBPK). "dim" berarti
+    # bukti lokasi lemah, BUKAN risiko rendah -- lihat evidence_note.
+    hotspot_intensity: str = Field(..., description="Intensitas visual hotspot dari monograf LiverTox: high, low, atau dim")
+    hotspot_display_mode: str = Field(..., description="Mode tampilan hotspot: focal (segmen spesifik) atau diffuse (seluruh 8 segmen)")
+    evidence_note: Optional[str] = Field(
+        None,
+        description="Catatan netral bila pola cedera spesifik tidak tersedia di data kurasi (fallback difus redup); null bila ada monograf spesifik",
+    )
     explainability_shap: List[str] = Field(..., description="Highlight gugus fungsi toxicophore kontributor DILI")
     cmax_hati: float = Field(..., description="Konsentrasi puncak obat di hati (mg/L)")
     auc_hati: float = Field(..., description="Area Under Curve konsentrasi obat di hati")

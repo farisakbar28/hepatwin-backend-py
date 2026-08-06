@@ -102,11 +102,28 @@ class SimulationOrchestrator:
         affected_segments: List[str] = []
 
         if compound.segment_list:
-            # Segment list disimpan sebagai koma terpisah, misal "V,VI,VII,VIII"
-            affected_segments = [s.strip() for s in compound.segment_list.split(",") if s.strip()]
+            # Segment list disimpan dengan pemisah titik-koma di DB nyata, mis.
+            # "V;VI;VII;VIII" (BUKAN koma -- diverifikasi lewat query langsung
+            # ke seluruh 1.231 senyawa is_simulatable=TRUE, F4). split(",") versi
+            # lama tidak pernah menemukan pemisah pada data nyata, sehingga
+            # affected_segments selalu berisi satu string gabungan yang salah
+            # utk 100% senyawa -- ditemukan & diperbaiki di sini (F4).
+            affected_segments = [s.strip() for s in compound.segment_list.split(";") if s.strip()]
         else:
             # Fallback jika tidak ada monograf spesifik -> Difus seluruh segmen
             affected_segments = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+
+        # C. Intensitas & mode hotspot (F4, PROJECT_FUSION.md SS4.3) -- lookup DB
+        # murni ("di mana, dan seberapa kuat buktinya"), TIDAK memengaruhi
+        # warna/kedip (itu murni hasil fusion_result di atas, "seberapa berisiko").
+        is_evidence_fallback = injury_pattern == "Tidak Terklasifikasi" or not compound.segment_list
+        hotspot_intensity = compound.hotspot_base_intensity or "dim"
+        hotspot_display_mode = compound.hotspot_display_mode or "diffuse"
+        evidence_note = (
+            "Pola cedera spesifik untuk senyawa ini belum tersedia di data kurasi; "
+            "hotspot ditampilkan difus redup sebagai default aman."
+            if is_evidence_fallback else None
+        )
 
         # C. Format Time Series Data
         ts_points = [
@@ -134,6 +151,9 @@ class SimulationOrchestrator:
             blinking_speed=blinking_speed,
             affected_segments=affected_segments,
             injury_pattern=injury_pattern,
+            hotspot_intensity=hotspot_intensity,
+            hotspot_display_mode=hotspot_display_mode,
+            evidence_note=evidence_note,
             explainability_shap=explainability_shap,
             cmax_hati=cmax_hati,
             auc_hati=auc_hati,

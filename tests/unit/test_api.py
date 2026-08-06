@@ -70,7 +70,7 @@ def test_simulation_valid_flow(mock_get_by_id):
         canonical_smiles="CC(=O)NC1=CC=C(O)C=C1",
         is_simulatable=True,
         injury_pattern="Hepatocellular",
-        segment_list="V, VI, VII, VIII"
+        segment_list="V;VI;VII;VIII"
     )
     mock_get_by_id.return_value = mock_compound
 
