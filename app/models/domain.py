@@ -18,7 +18,7 @@ SELECT gagal dengan "column does not exist").
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -76,3 +76,12 @@ class HepatwinCompound(Base):
 
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    # Index performa dari pbpk-engine untuk query yang sering dipakai
+    __table_args__ = (
+        Index("idx_hepatwin_cid", "cid"),
+        Index("idx_hepatwin_compound", "compound_name"),
+        Index("idx_hepatwin_simulatable", "is_simulatable"),
+        Index("idx_hepatwin_dili", "dili_concern"),
+        Index("idx_hepatwin_pattern", "injury_pattern"),
+    )

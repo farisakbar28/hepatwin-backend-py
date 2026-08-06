@@ -1,0 +1,81 @@
+{
+  "version": "PBPK_EXPOSURE_CALIBRATION_V2_3",
+  "source": "INTERNAL_DISTRIBUTIONAL_CALIBRATION",
+  "timestamp_utc": "2026-08-06T14:42:43+00:00",
+  "catalog_snapshot_sha256": "0a06e54dbea3dd0c1f9eeb0a11808a14cc9962d7d4f3b2044baa1617f03352d9",
+  "pbpk_config_sha256": "685842efd7311615269a9cd66aa9e13fef8f63f1040972b0b456a2c3a92c2eda",
+  "pbpk_config": {
+    "allometric": {
+      "base_cl_metabolism_70_l_h": 15.0,
+      "base_cl_renal_70_l_h": 2.0,
+      "cardiac_flow_70_l_h": 360.0,
+      "plasma_volume_fraction": 0.043,
+      "liver_volume_fraction": 0.0257,
+      "kidney_volume_fraction": 0.0044
+    },
+    "solver": {
+      "duration_hours": 24.0,
+      "step_hours": 0.1,
+      "method": "RK45",
+      "rtol": 1e-06,
+      "atol": 1e-08,
+      "kp_l": 5.0,
+      "kp_k": 2.0
+    },
+    "exposure": {
+      "formula": "log1p(cmax_liver_mg_l)+log1p(auc_liver_mg_h_l)",
+      "p33_quantile": 0.33,
+      "p66_quantile": 0.66
+    }
+  },
+  "catalog_rows": 1231,
+  "xlogp_values": 139,
+  "grid": {
+    "ages": [
+      0,
+      15,
+      16,
+      40,
+      90,
+      100
+    ],
+    "bmis": [
+      16,
+      18,
+      20,
+      22,
+      24,
+      26,
+      28,
+      30,
+      32,
+      34,
+      36,
+      38,
+      40
+    ],
+    "height_cm_by_gender": {
+      "L": 170.0,
+      "P": 160.0
+    },
+    "doses_mg_kg": [
+      0.5,
+      2,
+      5,
+      10,
+      15,
+      20,
+      30,
+      40,
+      50
+    ]
+  },
+  "samples": 1728324,
+  "p33_exposure_index": 8.238769621406693,
+  "p66_exposure_index": 10.919181899644531,
+  "category_counts": {
+    "LOW_EXPOSURE": 570343,
+    "MODERATE_EXPOSURE": 570860,
+    "HIGH_EXPOSURE": 587121
+  }
+}

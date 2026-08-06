@@ -1,0 +1,19 @@
+{
+  "catalog_snapshot_sha256": "0a06e54dbea3dd0c1f9eeb0a11808a14cc9962d7d4f3b2044baa1617f03352d9",
+  "patient": {
+    "usia": 40,
+    "jenis_kelamin": "L",
+    "berat_badan_kg": 70.0,
+    "tinggi_badan_cm": 168.0
+  },
+  "acetaminophen": {
+    "hepatwin_id": "HT0012",
+    "xlogp": 0.5,
+    "dosis_mg": 10500.0
+  },
+  "ibuprofen": {
+    "hepatwin_id": "HT0611",
+    "xlogp": 3.5,
+    "dosis_mg": 400.0
+  }
+}
