@@ -1,107 +1,116 @@
 import logging
-from typing import Dict, Any
+import math
+from typing import Any, Dict
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class AllometricService:
-    """
-    Modul konversi kovariat pasien menjadi parameter fisiologis PBPK 4-Kompartemen.
-    Seluruh konstanta telah diverifikasi oleh Anggi Fitriani (Spesialis Farmasi/Toksikologi).
-    Rujukan Pustaka:
-      - Brown et al. (1997) [22]: Volume hati 2.5% dari berat badan.
-      - Deurenberg et al. (1991) [23]: Estimasi persentase lemak tubuh (%BF).
-      - Soejima et al. (2022) [21]: Penurunan aliran darah hepatik 0.8%/tahun usia >= 40.
-      - Ghabril et al. (2025) [17]: Reduksi klirens metabolisme 20% pada BMI >= 30 (MASLD).
-    """
+    """Convert patient covariates to PRD v2.3 PBPK Phase 1 parameters."""
+
     @staticmethod
     def calculate_physiological_parameters(
         age: int,
         gender: str,
         weight_kg: float,
         height_cm: float,
-        base_cl_metabolism_l_hr: float = None,  # Nilai default atau dari deskriptor senyawa
-        xlogp: float = None
+        base_cl_metabolism_l_hr: float | None = None,
+        xlogp: float | None = None,
     ) -> Dict[str, Any]:
         if base_cl_metabolism_l_hr is None:
-            base_cl_metabolism_l_hr = settings.base_cl_metabolism_l_hr
-            
-        if weight_kg <= 0.0 or height_cm <= 0.0:
-            raise ValueError("Parameter berat dan tinggi badan harus lebih besar dari 0.")
+            base_cl_metabolism_l_hr = settings.PBPK_BASE_CL_METABOLISM_70_L_H
+        AllometricService._validate_inputs(age, weight_kg, height_cm, base_cl_metabolism_l_hr)
 
-        # 1. Indeks Massa Tubuh (BMI)
-        height_m = height_cm / 100.0
-        bmi = weight_kg / (height_m ** 2)
-
-        # 2. Pemetaan Jenis Kelamin
         gender_upper = gender.strip().upper()
-        if gender_upper in ["MALE", "M", "L", "LAKI-LAKI", "LAKI", "PRIA"]:
+        if gender_upper in {"MALE", "M", "L", "LAKI-LAKI", "LAKI", "PRIA"}:
             sex_val = 1
-        elif gender_upper in ["FEMALE", "F", "P", "PEREMPUAN", "WANITA"]:
+        elif gender_upper in {"FEMALE", "F", "P", "PEREMPUAN", "WANITA"}:
             sex_val = 0
         else:
             raise ValueError("Format jenis kelamin tidak valid.")
 
-        # 3. Persentase Lemak Tubuh (%BF - Deurenberg et al. 1991)
-        body_fat_pct = max(0.0, 1.20 * bmi + 0.23 * float(age) - 10.8 * sex_val - 5.4)
-
-        # 4. Volume Kompartemen (L) - Penskalaan proporsional berat tubuh
-        v_liver = settings.V_L_frac * weight_kg       # V_L: 2.5% dari berat badan (Brown et al. 1997) [ASUMSI DESAIN minor]
-        v_plasma = 0.040 * weight_kg      # V_P: 4.0% dari berat badan (Sirkulasi plasma)
-        v_kidney = 0.004 * weight_kg      # V_K: 0.4% dari berat badan
-        v_remainder = weight_kg - (v_liver + v_plasma + v_kidney) # V_R: Sisa tubuh
-
-        # 5. Laju Aliran Darah Hepatik Q_L 
-        # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik 90.0 L/h (Soejima et al. 2022)
-        q_l_base = settings.Q_L_baseline * ((weight_kg / 70.0) ** 0.75)  # Aliran baseline berskala alometrik
-        if age >= 40:
-            # Penurunan 0.8% (0.008) per tahun setelah umur 40 tahun
-            age_factor = max(0.20, 1.0 - 0.008 * (float(age) - 40.0))  # Floor 20% agar tidak negatif
-            q_liver = q_l_base * age_factor
+        height_m = float(height_cm) / 100.0
+        bmi = float(weight_kg) / (height_m**2)
+        if age <= 15:
+            body_fat_raw = 1.51 * bmi - 0.70 * age - 3.6 * sex_val + 1.4
         else:
-            q_liver = q_l_base
+            body_fat_raw = 1.20 * bmi + 0.23 * age - 10.8 * sex_val - 5.4
+        body_fat_clamped = min(max(body_fat_raw, 3.0), 60.0)
+        if not math.isclose(body_fat_raw, body_fat_clamped):
+            logger.warning(
+                "[PBPK BODY_FAT CLAMP] raw=%s clamped=%s age=%s",
+                body_fat_raw,
+                body_fat_clamped,
+                age,
+            )
 
-        # Aliran darah organ lain (L/hr)
-        q_kidney = 1.10 * ((weight_kg / 70.0) ** 0.75)
-        q_remainder = 3.00 * ((weight_kg / 70.0) ** 0.75)
+        weight_kg = float(weight_kg)
+        allometric_scale = (weight_kg / 70.0) ** 0.75
+        v_plasma = settings.PBPK_PLASMA_VOLUME_FRACTION * weight_kg
+        v_liver = settings.PBPK_LIVER_VOLUME_FRACTION * weight_kg
+        v_kidney = settings.PBPK_KIDNEY_VOLUME_FRACTION * weight_kg
+        v_remainder = max(weight_kg - v_plasma - v_liver - v_kidney, 1.0)
 
-        # 6. Klirens Metabolisme Hepatik (Cl_metabolisme) & Koreksi Obesitas MASLD
-        # [ASUMSI DESAIN -- PENDING FARMASI] Ghabril et al. 2025 tidak merekomendasikan ambang statis 20%
-        cl_scaled = base_cl_metabolism_l_hr * ((weight_kg / 70.0) ** 0.75)
-        if bmi >= 30.0:
-            # Reduksi otomatis 20% pada BMI >= 30 akibat perlemakan hati kronis
-            cl_metabolism = cl_scaled * 0.80
-        else:
-            cl_metabolism = cl_scaled
+        q_cardiac = settings.PBPK_CARDIAC_FLOW_70_L_H * allometric_scale
+        age_factor = 1.0 if age < 40 else max(0.60, 1.0 - 0.008 * (min(age, 90) - 40))
+        q_liver = 0.25 * q_cardiac * age_factor
+        q_kidney = 0.20 * q_cardiac
+        q_remainder = max(q_cardiac - q_liver - q_kidney, 0.0)
 
-        cl_renal = 2.0 * ((weight_kg / 70.0) ** 0.75)
+        cl_metabolism = min(float(base_cl_metabolism_l_hr) * allometric_scale, 0.95 * q_liver)
+        cl_renal = settings.PBPK_BASE_CL_RENAL_70_L_H * allometric_scale
 
-        # Formula penyesuaian koefisien partisi jaringan sisa (lipofilik)
         if xlogp is None:
-            logger.warning("[FALLBACK XLogP NULL hepatwin_id=... S5-SwissADME → 0]")
-            xlogp = 0.0
-            
-        if xlogp > 0:
-            kp_r_raw = 1.0 + (body_fat_pct / 100.0) * (10 ** (0.5 * xlogp))
-            kp_r = min(max(kp_r_raw, 0.5), 10.0)  # clamp S3 Coutinho 2024
-            # [ASUMSI DESAIN Kp_R -- PENDING K3/FARMASI]
-            # S3 Coutinho overpredict 69x
+            logger.warning("[FALLBACK XLogP NULL] xlogp_eff=0.0")
+            xlogp_eff = 0.0
         else:
-            kp_r = 1.0
+            if not math.isfinite(float(xlogp)):
+                raise ValueError("XLogP harus bernilai finite atau null.")
+            xlogp_eff = min(max(float(xlogp), -1.0), 7.0)
+        bf_frac = min(max(body_fat_clamped / 100.0, 0.03), 0.60)
+        kp_r = min(max(1.0 + bf_frac * (10 ** (0.25 * xlogp_eff)), 1.0), 10.0)
 
         return {
-            "bmi": round(bmi, 2),
-            "body_fat_pct": round(body_fat_pct, 2),
-            "V_P": round(v_plasma, 4),
-            "V_L": round(v_liver, 4),
-            "V_K": round(v_kidney, 4),
-            "V_R": round(v_remainder, 4),
-            "Q_L": round(q_liver, 4),
-            "Q_K": round(q_kidney, 4),
-            "Q_R": round(q_remainder, 4),
-            "Cl_metabolism": round(cl_metabolism, 4),
-            "Cl_renal": round(cl_renal, 4),
-            "K_P_L": 5.0,  # Koefisien partisi jaringan-terhadap-plasma standar
+            "bmi": bmi,
+            "metabolic_risk_flag": bmi >= 30.0,
+            "clearance_multiplier_from_bmi": 1.0,
+            "body_fat_percent_raw": body_fat_raw,
+            "body_fat_percent_clamped": body_fat_clamped,
+            "body_fat_pct": body_fat_clamped,
+            "xlogp_eff": xlogp_eff,
+            "V_P": v_plasma,
+            "V_L": v_liver,
+            "V_K": v_kidney,
+            "V_R": v_remainder,
+            "Q_C": q_cardiac,
+            "Q_L": q_liver,
+            "Q_K": q_kidney,
+            "Q_R": q_remainder,
+            "age_factor": age_factor,
+            "Cl_metabolism": cl_metabolism,
+            "Cl_renal": cl_renal,
+            "Cl_metabolism_source": "FALLBACK_BASE_CL_MET_70",
+            "Cl_renal_source": "DESIGN_FALLBACK_BASE_CL_RENAL_70",
+            "K_P_L": 5.0,
             "K_P_K": 2.0,
-            "K_P_R": round(kp_r, 4)
+            "K_P_R": kp_r,
         }
+
+    @staticmethod
+    def _validate_inputs(
+        age: int,
+        weight_kg: float,
+        height_cm: float,
+        base_cl_metabolism_l_hr: float,
+    ) -> None:
+        if isinstance(age, bool) or not isinstance(age, int) or not 0 <= age <= 100:
+            raise ValueError("Usia harus berupa integer antara 0 dan 100 tahun.")
+        for name, value in {
+            "berat badan": weight_kg,
+            "tinggi badan": height_cm,
+            "base clearance metabolism": base_cl_metabolism_l_hr,
+        }.items():
+            if not math.isfinite(float(value)) or float(value) <= 0.0:
+                raise ValueError(f"Parameter {name} harus bernilai finite dan lebih besar dari 0.")

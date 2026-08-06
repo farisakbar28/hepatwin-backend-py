@@ -30,14 +30,9 @@ venv/
 __pycache__/
 *.py[cod]
 *$py.class
-HepaTwin_PRD.md
-
 # Backup PRD untuk referensi perbaikan di masa mendatang
 # (Komentari jika terlalu berisik)
 HepaTwin_PRD_v2.0_backup_2026-08-06.md
-
-# Laporan audit FINAL - lokal saja, jangan ke-push
-PBPK_Engine_Audit_Report.md
 
 # ==========================================
 # 3. STORAGE, DATABASE & SESSIONS

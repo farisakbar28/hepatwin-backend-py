@@ -14,22 +14,14 @@ class Settings(BaseSettings):
     AI_MODEL_PATH: str = "models/model.pt"
     DEBUG: bool = False
     
-    # [ASUMSI DESAIN -- PENDING K3] 30/10 & 0.40/0.35/0.30/0.20
-    DOSE_HIGH_THRESHOLD: float = 30.0
-    DOSE_MODERATE_THRESHOLD: float = 10.0
-    RATIO_HIGH_MODIFIER: float = 0.35
-    RATIO_HIGH_NORMAL: float = 0.40
-    RATIO_MODERATE_MODIFIER: float = 0.20
-    RATIO_MODERATE_NORMAL: float = 0.30
-
-    # [ASUMSI DESAIN -- PENDING FARMASI]
-    base_cl_metabolism_l_hr: float = 15.0  
-
-    # [ASUMSI DESAIN minor -- PENDING FARMASI] Basis alometrik 90.0 L/h
-    Q_L_baseline: float = 90.0
-
-    # [ASUMSI DESAIN minor]
-    V_L_frac: float = 0.025  
+    # PBPK Phase 1 v2.3. The renal fallback remains a transparent design
+    # parameter until compound-specific renal data are curated.
+    PBPK_BASE_CL_METABOLISM_70_L_H: float = 15.0
+    PBPK_BASE_CL_RENAL_70_L_H: float = 2.0
+    PBPK_CARDIAC_FLOW_70_L_H: float = 360.0
+    PBPK_PLASMA_VOLUME_FRACTION: float = 0.043
+    PBPK_LIVER_VOLUME_FRACTION: float = 0.0257
+    PBPK_KIDNEY_VOLUME_FRACTION: float = 0.0044
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

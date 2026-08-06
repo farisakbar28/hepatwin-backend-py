@@ -1,134 +1,78 @@
+import math
+import json
+from pathlib import Path
+
 import pytest
+
+from app.services import pbpk_calibration
 from app.services.exposure_evaluator import ExposureEvaluatorService, ExposureRiskLevel
 
-def test_zero_absolute_threshold_dependence():
-    """
-    Membuktikan bahwa fungsi evaluasi tidak pernah membutuhkan atau mengecek
-    kolom threshold_available, serta mengembalikan threshold_line_used = False.
-    """
-    result = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=10.0,
-        auc=50.0,
-        age=30,
-        bmi=22.0,
-        dose_mg=500.0,
-        weight_kg=70.0
-    )
-    
-    assert "threshold_line_used" in result
-    assert result["threshold_line_used"] is False
-    assert result["risk_level"] in [e.value for e in ExposureRiskLevel]
 
-def test_uniform_evaluation_across_compounds():
-    """
-    Membuktikan bahwa evaluasi seragam untuk senyawa apapun (Acetaminophen, Ibuprofen, dll).
-    Karena ExposureEvaluatorService.evaluate_relative_exposure() TIDAK menerima nama senyawa
-    atau ID senyawa, maka secara matematis tidak mungkin ada aturan hardcode untuk
-    Acetaminophen (Nomogram Rumack-Matthew).
-    Keduanya dievaluasi murni dari angka PBPK dan demografi.
-    """
-    # Acetaminophen simulation
-    result_acetaminophen = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=100.0,
-        auc=400.0,
-        age=25,
-        bmi=24.0,
-        dose_mg=4000.0, # Overdosis
-        weight_kg=60.0
-    )
-    
-    # Ibuprofen simulation (with identical parameters to Acetaminophen for test sake)
-    result_ibuprofen = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=100.0,
-        auc=400.0,
-        age=25,
-        bmi=24.0,
-        dose_mg=4000.0,
-        weight_kg=60.0
-    )
-    
-    assert result_acetaminophen["risk_level"] == result_ibuprofen["risk_level"]
-    assert result_acetaminophen["relative_risk_score"] == result_ibuprofen["relative_risk_score"]
-    assert result_acetaminophen["dose_per_kg"] == 66.67
-    assert result_acetaminophen["risk_level"] == ExposureRiskLevel.HIGH.value
+def test_shape_ratio_and_exposure_index_have_prd_v23_meaning():
+    result = ExposureEvaluatorService.evaluate_relative_exposure(cmax=9.0, auc=99.0)
 
-def test_vulnerability_modifiers_age_and_bmi():
-    """
-    Membuktikan bahwa pada dosis/rasio yang sama, pasien berusia lanjut (>= 60)
-    atau ber-BMI obesitas (>= 30) mendapatkan tingkat risiko yang lebih tinggi.
-    """
-    # Baseline dewasa muda sehat (cmax_auc = 0.28, dose = 7.14) -> MODERATE threshold is 0.30 -> LOW
-    result_healthy = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=14.0,
-        auc=50.0, 
-        age=30,
-        bmi=24.0,
-        dose_mg=500.0, 
-        weight_kg=70.0
-    )
-    assert result_healthy["has_vulnerability_modifier"] is False
-    assert result_healthy["risk_level"] == ExposureRiskLevel.LOW.value
-
-    # Lansia (Usia >= 60) -> vulnerable, MODERATE threshold drops to 0.20 -> MODERATE
-    result_elderly = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=14.0,
-        auc=50.0,
-        age=65,
-        bmi=24.0,
-        dose_mg=500.0,
-        weight_kg=70.0
-    )
-    assert result_elderly["has_vulnerability_modifier"] is True
-    assert result_elderly["risk_level"] == ExposureRiskLevel.MODERATE.value
-
-    # Obesitas / MASLD (BMI >= 30) -> vulnerable, MODERATE threshold drops to 0.20 -> MODERATE
-    result_obese = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=14.0,
-        auc=50.0,
-        age=30,
-        bmi=32.0,
-        dose_mg=500.0,
-        weight_kg=70.0
-    )
-    assert result_obese["has_vulnerability_modifier"] is True
-    assert result_obese["risk_level"] == ExposureRiskLevel.MODERATE.value
-
-def test_zero_dose_elderly_is_low_exposure():
-    """
-    Memastikan lansia dengan dosis 0 (cmax=0, auc=0) tidak secara konyol dicap Moderate.
-    """
-    result = ExposureEvaluatorService.evaluate_relative_exposure(
-        cmax=0.0,
-        auc=0.0,
-        age=65,
-        bmi=24.0,
-        dose_mg=0.0,
-        weight_kg=70.0
-    )
-    assert result["has_vulnerability_modifier"] is True
-    assert result["cmax_auc_ratio"] == 0.0
-    assert result["dose_per_kg"] == 0.0
+    assert result["shape_ratio_h_inv"] == pytest.approx(9.0 / 99.0)
+    assert result["cmax_auc_ratio"] == result["shape_ratio_h_inv"]
+    assert result["exposure_index"] == pytest.approx(math.log1p(9.0) + math.log1p(99.0))
     assert result["risk_level"] == ExposureRiskLevel.LOW.value
+    assert result["exposure_category_source"] == "INTERNAL_DISTRIBUTIONAL_CALIBRATION"
 
-def test_invalid_inputs_raise_value_error():
-    """
-    Memastikan weight_kg = 0 memicu ValueError, begitu juga nilai negatif.
-    """
-    with pytest.raises(ValueError, match="Parameter fisik/farmakokinetik tidak valid"):
-        ExposureEvaluatorService.evaluate_relative_exposure(
-            cmax=10.0,
-            auc=50.0,
-            age=30,
-            bmi=24.0,
-            dose_mg=500.0,
-            weight_kg=0.0 # Error!
-        )
-    with pytest.raises(ValueError, match="Parameter fisik/farmakokinetik tidak valid"):
-        ExposureEvaluatorService.evaluate_relative_exposure(
-            cmax=-10.0,
-            auc=50.0,
-            age=30,
-            bmi=24.0,
-            dose_mg=500.0,
-            weight_kg=70.0 # Error!
-        )
+
+def test_quantile_boundaries_define_categories(monkeypatch):
+    monkeypatch.setattr(pbpk_calibration, "P33_EXPOSURE_INDEX", 0.0)
+    monkeypatch.setattr(pbpk_calibration, "P66_EXPOSURE_INDEX", 0.0)
+    assert ExposureEvaluatorService.evaluate_relative_exposure(0.0, 0.0)["risk_level"] == "MODERATE_EXPOSURE"
+
+    monkeypatch.setattr(pbpk_calibration, "P33_EXPOSURE_INDEX", 1.0)
+    monkeypatch.setattr(pbpk_calibration, "P66_EXPOSURE_INDEX", 2.0)
+    assert ExposureEvaluatorService.evaluate_relative_exposure(0.0, 0.0)["risk_level"] == "LOW_EXPOSURE"
+    assert ExposureEvaluatorService.evaluate_relative_exposure(10.0, 100.0)["risk_level"] == "HIGH_EXPOSURE"
+
+
+def test_unfrozen_or_invalid_calibration_fails_explicitly(monkeypatch):
+    monkeypatch.setattr(pbpk_calibration, "P33_EXPOSURE_INDEX", None)
+    monkeypatch.setattr(pbpk_calibration, "P66_EXPOSURE_INDEX", None)
+    with pytest.raises(RuntimeError, match="belum dibekukan"):
+        ExposureEvaluatorService.evaluate_relative_exposure(1.0, 1.0)
+
+
+def test_frozen_runtime_calibration_matches_the_hashed_report():
+    report_path = Path(__file__).parents[2] / "reports" / "pbpk_exposure_calibration_v2_3.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+
+    assert pbpk_calibration.CATALOG_SNAPSHOT_SHA256 == report["catalog_snapshot_sha256"]
+    assert pbpk_calibration.CALIBRATION_VERSION == report["version"]
+    assert pbpk_calibration.PBPK_CONFIG_SHA256 == report["pbpk_config_sha256"]
+    assert pbpk_calibration.runtime_pbpk_config_snapshot() == report["pbpk_config"]
+    assert pbpk_calibration.P33_EXPOSURE_INDEX == pytest.approx(report["p33_exposure_index"])
+    assert pbpk_calibration.P66_EXPOSURE_INDEX == pytest.approx(report["p66_exposure_index"])
+    pbpk_calibration.ensure_runtime_config_matches_calibration()
+
+
+def test_runtime_configuration_drift_is_rejected(monkeypatch):
+    monkeypatch.setattr(pbpk_calibration, "PBPK_CONFIG_SHA256", "invalid")
+    with pytest.raises(RuntimeError, match="runtime configuration"):
+        ExposureEvaluatorService.evaluate_relative_exposure(1.0, 1.0)
+
+
+def test_sweep_runtime_writer_preserves_calibration_guard(tmp_path):
+    from scripts.run_sweep_histogram import _write_runtime_calibration
+
+    source_path = Path(__file__).parents[2] / "app" / "services" / "pbpk_calibration.py"
+    generated_path = tmp_path / "pbpk_calibration.py"
+    generated_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    _write_runtime_calibration(generated_path, 1.25, 2.5, "catalog-hash", "config-hash", "2026-08-06T00:00:00+00:00")
+    generated = generated_path.read_text(encoding="utf-8")
+
+    assert "def ensure_runtime_config_matches_calibration" in generated
+    assert "CATALOG_SNAPSHOT_SHA256 = 'catalog-hash'" in generated
+    assert "PBPK_CONFIG_SHA256 = 'config-hash'" in generated
+    assert "P33_EXPOSURE_INDEX = 1.25" in generated
+    assert "P66_EXPOSURE_INDEX = 2.5" in generated
+
+
+@pytest.mark.parametrize("cmax,auc", [(math.nan, 1.0), (1.0, math.inf), (-1.0, 1.0)])
+def test_invalid_exposure_inputs_are_rejected(cmax, auc):
+    with pytest.raises(ValueError, match="finite"):
+        ExposureEvaluatorService.evaluate_relative_exposure(cmax, auc)

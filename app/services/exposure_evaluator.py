@@ -1,66 +1,50 @@
+import math
 from enum import Enum
-from typing import Dict, Any
-from app.core.config import settings
+from typing import Any, Dict
 
-USE_CANDIDATE_K3 = False
+from app.services import pbpk_calibration
+
 
 class ExposureRiskLevel(str, Enum):
     LOW = "LOW_EXPOSURE"
     MODERATE = "MODERATE_EXPOSURE"
     HIGH = "HIGH_EXPOSURE"
 
+
 class ExposureEvaluatorService:
-    """
-    Modul evaluasi profil paparan relatif seragam tanpa garis ambang absolut.
-    Berlaku konsisten untuk seluruh 1.231 senyawa is_simulatable = TRUE.
-    Rujukan klinis modifikator demografis:
-      - Soejima et al. (2022) [21]: Kerentanan eliminasi pada Usia >= 60 tahun.
-      - Ghabril et al. (2025) [17]: MASLD/perlemakan hati pada BMI >= 30 kg/m2.
-    """
+    """Evaluate PRD v2.3 PBPK magnitude exposure from frozen quantiles only."""
+
     @staticmethod
-    def evaluate_relative_exposure(
-        cmax: float,
-        auc: float,
-        age: int,
-        bmi: float,
-        dose_mg: float,
-        weight_kg: float
-    ) -> Dict[str, Any]:
-        if weight_kg <= 0.0 or auc < 0.0 or dose_mg < 0.0 or cmax < 0.0:
-            raise ValueError("Parameter fisik/farmakokinetik tidak valid (<= 0 atau negatif).")
-            
-        # 1. Hitung rasio paparan relatif cmax / auc
-        cmax_auc_ratio = (cmax / auc) if auc > 0 else 0.0
+    def evaluate_relative_exposure(cmax: float, auc: float, **_: Any) -> Dict[str, Any]:
+        if not all(math.isfinite(float(value)) and float(value) >= 0.0 for value in (cmax, auc)):
+            raise ValueError("Cmax dan AUC harus bernilai finite dan tidak negatif.")
+        pbpk_calibration.ensure_runtime_config_matches_calibration()
+        if pbpk_calibration.P33_EXPOSURE_INDEX is None or pbpk_calibration.P66_EXPOSURE_INDEX is None:
+            raise RuntimeError("PBPK exposure calibration v2.3 belum dibekukan.")
 
-        # 2. Hitung dosis relatif per berat badan (mg/kg) sebagai metrik beban bolus
-        dose_per_kg = dose_mg / weight_kg
+        cmax = float(cmax)
+        auc = float(auc)
+        shape_ratio_h_inv = cmax / auc if auc > 0.0 else 0.0
+        exposure_index = math.log1p(cmax) + math.log1p(auc)
+        p33 = float(pbpk_calibration.P33_EXPOSURE_INDEX)
+        p66 = float(pbpk_calibration.P66_EXPOSURE_INDEX)
+        if not math.isfinite(p33) or not math.isfinite(p66) or p33 > p66:
+            raise RuntimeError("PBPK exposure calibration v2.3 tidak valid.")
 
-        # 3. Faktor Modifikator Demografis (Usia lanjut atau Obesitas MASLD)
-        has_vulnerability_modifier = (age >= 60) or (bmi >= 30.0)
-        
-        # Penyesuaian ambang dinamis
-        # [ASUMSI DESAIN -- PENDING K3] 0.40/0.35/0.30/0.20
-        high_threshold = settings.RATIO_HIGH_MODIFIER if has_vulnerability_modifier else settings.RATIO_HIGH_NORMAL
-        moderate_threshold = settings.RATIO_MODERATE_MODIFIER if has_vulnerability_modifier else settings.RATIO_MODERATE_NORMAL
-
-        # 4. Logika Evaluasi Seragam (Tanpa perbandingan terhadap ambang mg/L literatur)
-        # Kriteria relatif empiris yang seragam untuk seluruh senyawa simulatable:
-        # [ASUMSI DESAIN -- PENDING K3] 30/10
-        if dose_per_kg >= settings.DOSE_HIGH_THRESHOLD or cmax_auc_ratio > high_threshold:
-            risk_level = ExposureRiskLevel.HIGH
-            risk_score = 0.85
-        elif dose_per_kg >= settings.DOSE_MODERATE_THRESHOLD or cmax_auc_ratio > moderate_threshold:
-            risk_level = ExposureRiskLevel.MODERATE
-            risk_score = 0.50
-        else:
+        if exposure_index < p33:
             risk_level = ExposureRiskLevel.LOW
-            risk_score = 0.15
+        elif exposure_index <= p66:
+            risk_level = ExposureRiskLevel.MODERATE
+        else:
+            risk_level = ExposureRiskLevel.HIGH
 
         return {
             "risk_level": risk_level.value,
-            "relative_risk_score": risk_score,
-            "cmax_auc_ratio": round(cmax_auc_ratio, 4),
-            "dose_per_kg": round(dose_per_kg, 2),
-            "has_vulnerability_modifier": has_vulnerability_modifier,
-            "threshold_line_used": False  # Penegasan eksplisit bahwa ambang absolut TIDAK digunakan
+            "cmax_auc_ratio": shape_ratio_h_inv,
+            "shape_ratio_h_inv": shape_ratio_h_inv,
+            "exposure_index": exposure_index,
+            "p33_calibration": p33,
+            "p66_calibration": p66,
+            "exposure_category_source": pbpk_calibration.CALIBRATION_SOURCE,
+            "calibration_version": pbpk_calibration.CALIBRATION_VERSION,
         }

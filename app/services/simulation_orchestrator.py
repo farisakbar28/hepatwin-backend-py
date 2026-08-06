@@ -57,7 +57,7 @@ class SimulationOrchestrator:
         cov = request.covariates
         pbpk_task = loop.run_in_executor(
             None,
-            self.pbpk_engine.simulate,
+            self.pbpk_engine.simulate_with_diagnostics,
             request.dosis_mg,
             cov.usia,
             cov.jenis_kelamin,
@@ -67,21 +67,15 @@ class SimulationOrchestrator:
         )
 
         # Tunggu luaran kedua mesin secara asinkron
-        dili_score, explainability_shap, (time_series_data, cmax_hati, auc_hati) = await asyncio.gather(
+        dili_score, explainability_shap, pbpk_result = await asyncio.gather(
             ai_task, shap_task, pbpk_task
         )
 
         # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
         # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
-        bmi = cov.berat_badan_kg / ((cov.tinggi_badan_cm/100)**2)
-        
         exposure_result = ExposureEvaluatorService.evaluate_relative_exposure(
-            cmax=cmax_hati,
-            auc=auc_hati,
-            age=cov.usia,
-            bmi=bmi,
-            dose_mg=request.dosis_mg,
-            weight_kg=cov.berat_badan_kg
+            cmax=pbpk_result.cmax_hati,
+            auc=pbpk_result.auc_hati,
         )
         
         risk_level, visual_color, blinking_speed = FusionService.determine_visual_status(
@@ -107,14 +101,16 @@ class SimulationOrchestrator:
                 c_plasma=pt["c_plasma"],
                 c_hati=pt["c_hati"]
             )
-            for pt in time_series_data
+            for pt in pbpk_result.time_series
         ]
 
         disclaimer = (
             "PENTING (MEDICAL DISCLAIMER): HepaTwin merupakan perangkat lunak penunjang keputusan (decision support system) "
             "praklinis murni in silico. Hasil prediksi dan visualisasi 3D bertujuan membantu penyusunan hipotesis ilmiah dan "
             "triase skrining awal, BUKAN diagnosis klinis, keputusan medis, atau pengganti mutlak bagi pengujian in vitro / in vivo. "
-            "Seluruh kalkulasi beroperasi pada tingkat Context of Use berisiko rendah berdasarkan standar ASME V&V 40 (2018)."
+            "Model PBPK Fase 1 adalah model linear bolus tunggal tanpa absorpsi oral, protein binding, Km/Vmax, "
+            "NAPQI/glutathione depletion, atau parameter IVIVE compound-specific penuh. Ambang exposure bersifat "
+            "kalibrasi distribusional internal, bukan ambang klinis."
         )
 
         return SimulationResponse(
@@ -126,9 +122,17 @@ class SimulationOrchestrator:
             blinking_speed=blinking_speed,
             affected_segments=affected_segments,
             injury_pattern=injury_pattern,
+            segment_mapping_type="PEDAGOGICAL_HEURISTIC",
+            segment_mapping_not_clinical_localization=True,
             explainability_shap=explainability_shap,
-            cmax_hati=cmax_hati,
-            auc_hati=auc_hati,
+            cmax_hati=pbpk_result.cmax_hati,
+            auc_hati=pbpk_result.auc_hati,
+            cmax_auc_ratio=exposure_result["cmax_auc_ratio"],
+            shape_ratio_h_inv=exposure_result["shape_ratio_h_inv"],
+            exposure_index=exposure_result["exposure_index"],
+            exposure_category=exposure_result["risk_level"],
+            exposure_category_source=exposure_result["exposure_category_source"],
+            exposure_calibration_version=exposure_result["calibration_version"],
             time_series_pbpk=ts_points,
             disclaimer_permanent=disclaimer
         )
