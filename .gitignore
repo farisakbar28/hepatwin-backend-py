@@ -32,6 +32,13 @@ __pycache__/
 *$py.class
 HepaTwin_PRD.md
 
+# Backup PRD untuk referensi perbaikan di masa mendatang
+# (Komentari jika terlalu berisik)
+HepaTwin_PRD_v2.0_backup_2026-08-06.md
+
+# Laporan audit FINAL - lokal saja, jangan ke-push
+PBPK_Engine_Audit_Report.md
+
 # ==========================================
 # 3. STORAGE, DATABASE & SESSIONS
 # ==========================================
@@ -120,4 +127,9 @@ models/
 *.pth
 *.h5
 
-HepaTwin_Draft_Proposal_GEMASTIK_XIX_2026.mdreports/
+# === LOCAL ONLY - AUDIT DOKS, JANGAN PUSH KE GITHUB ===
+# Laporan audit brutal & checklist Farmasi/Fusion - lokal saja
+/reports/
+report/
+docs/audits/
+docs/
