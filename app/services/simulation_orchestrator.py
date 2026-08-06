@@ -89,9 +89,12 @@ class SimulationOrchestrator:
             weight_kg=cov.berat_badan_kg
         )
         
-        risk_level, visual_color, blinking_speed = FusionService.determine_visual_status(
+        fusion_result = FusionService.determine_visual_status(
             dili_score=dili_score,
             exposure_category=exposure_result["risk_level"]
+        )
+        risk_level, visual_color, blinking_speed = (
+            fusion_result.risk_level, fusion_result.visual_color, fusion_result.blinking_speed
         )
 
         # B. Pemetaan Segmen Couinaud dari Monograf LiverTox

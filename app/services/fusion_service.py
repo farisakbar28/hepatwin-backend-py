@@ -1,38 +1,71 @@
-from typing import Tuple
+from enum import Enum
+from typing import Dict, NamedTuple, Tuple
+
+from app.core.config import settings
 from app.services.exposure_evaluator import ExposureRiskLevel
+
+
+class AiRiskBand(str, Enum):
+    """Band dili_score terkalibrasi, ambang dari `settings.FUSION_AI_T_LOW`/
+    `FUSION_AI_T_HIGH` (F2, gerbang K2) -- BUKAN 0.30/0.70 tetap seperti versi
+    lama, karena rentang keluaran kalibrator terkunci di [~0.4337, ~0.7747]
+    (PROJECT_FUSION.md SS3.1)."""
+
+    AI_LOW = "AI_LOW"
+    AI_MID = "AI_MID"
+    AI_HIGH = "AI_HIGH"
+
+
+class FusionResult(NamedTuple):
+    risk_level: str
+    visual_color: str
+    blinking_speed: str
+    fusion_reason: str
+
+
+# Matriks 3x3 eksplisit (PROJECT_FUSION.md SS4.1, PRD Bab 8.3) -- menggantikan
+# rantai `if/elif ... or ...` lama yang membuat cabang hijau & MODERATE_EXPOSURE
+# jadi kode mati (SS3.1, SS3.2). Seluruh 9 sel terlihat, tidak ada yang bisa
+# tersembunyi tak-terjangkau secara struktural.
+_MATRIX: Dict[Tuple[AiRiskBand, str], Tuple[str, str, str]] = {
+    (AiRiskBand.AI_LOW, ExposureRiskLevel.LOW.value): ("low", "green", "none"),
+    (AiRiskBand.AI_LOW, ExposureRiskLevel.MODERATE.value): ("medium", "yellow", "slow"),
+    (AiRiskBand.AI_LOW, ExposureRiskLevel.HIGH.value): ("high", "red", "fast"),
+    (AiRiskBand.AI_MID, ExposureRiskLevel.LOW.value): ("medium", "yellow", "slow"),
+    (AiRiskBand.AI_MID, ExposureRiskLevel.MODERATE.value): ("medium", "yellow", "slow"),
+    (AiRiskBand.AI_MID, ExposureRiskLevel.HIGH.value): ("high", "red", "fast"),
+    (AiRiskBand.AI_HIGH, ExposureRiskLevel.LOW.value): ("high", "red", "fast"),
+    (AiRiskBand.AI_HIGH, ExposureRiskLevel.MODERATE.value): ("high", "red", "fast"),
+    (AiRiskBand.AI_HIGH, ExposureRiskLevel.HIGH.value): ("high", "red", "fast"),
+}
+
 
 class FusionService:
     """
     Lapisan Fusi Rule-Based (Backend Fusi AI + PBPK).
-    Menentukan warna WebGL dan kecepatan kedip hotspot berdasarkan fusi 
-    Probabilitas AI (GATNN-DNN) dan Metrik Paparan Relatif (Cmax/AUC).
-    Referensi: PRD v2.0 Bab 6.3 dan Bab 8.3
+    Menentukan warna WebGL dan kecepatan kedip hotspot berdasarkan fusi
+    Probabilitas AI (GATNN-DNN, band AI_LOW/AI_MID/AI_HIGH) dan Metrik Paparan
+    Relatif PBPK (LOW/MODERATE/HIGH_EXPOSURE), murni rule-based (TIDAK ADA
+    machine learning atau pembobotan yang dipelajari -- syarat eksplisit D9).
+    Referensi: PRD v2.0 Bab 6.3 dan Bab 8.3; PROJECT_FUSION.md SS4.1 (F3).
     """
-    @staticmethod
-    def determine_visual_status(
-        dili_score: float,
-        exposure_category: str
-    ) -> Tuple[str, str, str]:
-        """
-        Mengembalikan tuple (risk_level, visual_color, blinking_speed)
-        Berdasarkan matriks keputusan SOT Bab 8.3:
-        - HIJAU (STABLE) -> P_DILI < 30% dan LOW_EXPOSURE
-        - KUNING (SLOW) -> 30% <= P_DILI <= 70% atau MODERATE_EXPOSURE
-        - MERAH (FAST) -> P_DILI > 70% atau HIGH_EXPOSURE
-        """
-        # Default
-        risk_level = "low"
-        visual_color = "green"
-        blinking_speed = "none"
 
-        # Aturan berjenjang (dari keparahan tertinggi ke terendah)
-        if dili_score > 0.70 or exposure_category == ExposureRiskLevel.HIGH.value:
-            risk_level = "high"
-            visual_color = "red"
-            blinking_speed = "fast"
-        elif dili_score >= 0.30 or exposure_category == ExposureRiskLevel.MODERATE.value:
-            risk_level = "medium"
-            visual_color = "yellow"
-            blinking_speed = "slow"
-            
-        return risk_level, visual_color, blinking_speed
+    @staticmethod
+    def classify_ai_band(dili_score: float) -> AiRiskBand:
+        if dili_score < settings.FUSION_AI_T_LOW:
+            return AiRiskBand.AI_LOW
+        if dili_score > settings.FUSION_AI_T_HIGH:
+            return AiRiskBand.AI_HIGH
+        return AiRiskBand.AI_MID
+
+    @staticmethod
+    def determine_visual_status(dili_score: float, exposure_category: str) -> FusionResult:
+        """
+        Mengembalikan `FusionResult(risk_level, visual_color, blinking_speed, fusion_reason)`
+        lewat lookup matriks 3x3 eksplisit -- setiap sel bisa diaudit langsung,
+        tidak ada kondisi `or` yang membuat satu sisi selalu menang.
+        """
+        ai_band = FusionService.classify_ai_band(dili_score)
+        risk_level, visual_color, blinking_speed = _MATRIX[(ai_band, exposure_category)]
+        fusion_reason = f"{ai_band.value} x {exposure_category}"
+        return FusionResult(risk_level, visual_color, blinking_speed, fusion_reason)
