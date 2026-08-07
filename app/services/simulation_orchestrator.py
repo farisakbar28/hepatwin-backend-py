@@ -153,6 +153,22 @@ class SimulationOrchestrator:
             if is_evidence_fallback else None
         )
 
+        # C2. Sinyal eskalasi PRD v2.3 SS8.3.3 (R5, gerbang G1/G2) -- INFORMATIF
+        # SAJA, tidak memengaruhi warna. Lihat reports/R4_dampak_eskalasi.md.
+        metabolic_risk_flag = bool(pbpk_result.parameters.get("metabolic_risk_flag", False))
+        metabolic_risk_note = (
+            "Pasien memiliki BMI >= 30 (indikator risiko metabolik/MASLD). Catatan informatif -- "
+            "BELUM memengaruhi warna/prioritas visual, menunggu keputusan Farmasi (gerbang G1)."
+            if metabolic_risk_flag else None
+        )
+        evidence_strength = "specific" if injury_pattern in {"Hepatoseluler", "Kolestatik", "Campuran"} else "none"
+        evidence_strength_note = (
+            "Senyawa ini memiliki pola cedera spesifik di monograf LiverTox. Catatan informatif -- "
+            "BELUM memengaruhi warna/prioritas visual menjadi MERAH otomatis, menunggu definisi "
+            "'strong evidence' dari Farmasi (gerbang G2)."
+            if evidence_strength == "specific" else None
+        )
+
         # D. Format Time Series Data
         ts_points = [
             TimeSeriesPBPKPoint(
@@ -213,6 +229,10 @@ class SimulationOrchestrator:
             exposure_category=exposure_result["risk_level"],
             exposure_category_source=exposure_result["exposure_category_source"],
             exposure_calibration_version=exposure_result["calibration_version"],
+            metabolic_risk_flag=metabolic_risk_flag,
+            metabolic_risk_note=metabolic_risk_note,
+            evidence_strength=evidence_strength,
+            evidence_strength_note=evidence_strength_note,
             time_series_pbpk=ts_points,
             disclaimer_permanent=disclaimer,
             shap_detail=shap_detail,

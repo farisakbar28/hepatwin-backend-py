@@ -83,6 +83,18 @@ class SimulationResponse(BaseModel):
     exposure_category: Literal["LOW_EXPOSURE", "MODERATE_EXPOSURE", "HIGH_EXPOSURE"]
     exposure_category_source: Literal["INTERNAL_DISTRIBUTIONAL_CALIBRATION"]
     exposure_calibration_version: str
+
+    # --- R5 (gerbang G1/G2, PROJECT_FUSION_V23.md SS3.2): dua sinyal PRD v2.3
+    # SS8.3.3 diekspos sbg field INFORMATIF SAJA, TIDAK memengaruhi warna --
+    # G1/G2 belum diputuskan Ketua Tim/Farmasi. Mengaktifkannya sbg pengubah
+    # warna mentah-mentah berisiko mengulang pola kegagalan SS3.1/SS3.2 (lihat
+    # reports/R4_dampak_eskalasi.md: 44% pengguna BMI>=30 akan kehilangan
+    # HIJAU permanen bila diaktifkan tanpa syarat).
+    metabolic_risk_flag: bool = Field(..., description="BMI pasien >= 30 (indikator risiko metabolik) -- [PENDING G1] belum memengaruhi warna")
+    metabolic_risk_note: Optional[str] = Field(None, description="Catatan naratif bila metabolic_risk_flag=True; null bila False")
+    evidence_strength: Literal["specific", "none"] = Field(..., description="'specific' bila injury_pattern bukti spesifik tersedia -- [PENDING G2] definisi 'strong evidence' belum diputuskan Farmasi, belum memengaruhi warna")
+    evidence_strength_note: Optional[str] = Field(None, description="Catatan naratif bila evidence_strength='specific'; null bila 'none'")
+
     time_series_pbpk: List[TimeSeriesPBPKPoint] = Field(..., description="Kurva konsentrasi C_hati(t) & C_plasma(t) 24 jam")
     disclaimer_permanent: str = Field(..., description="Medical Disclaimer resmi HepaTwin (ASME V&V 40)")
 

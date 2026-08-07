@@ -53,6 +53,34 @@ def test_vno_safe_compound_reaches_green_end_to_end(client):
     assert data["fusion_reason"] == "AI_LOW x LOW_EXPOSURE"
 
 
+def test_metabolic_risk_flag_does_not_block_green(client):
+    """Test (R5, gerbang G1 belum diputuskan): metabolic_risk_flag=True
+    (BMI>=30) HARUS TETAP membiarkan HIJAU tercapai -- membuktikan jalur
+    eskalasi default (informatif saja) TIDAK memengaruhi warna. Bila ini
+    gagal setelah G1 diputuskan "aktifkan eskalasi", itu regresi yang
+    disengaja -- perbarui test, jangan diam-diam dibiarkan merah."""
+    resp = client.post(
+        "/api/v1/simulate",
+        json=_payload("HT-VNO-SAFE-TEST", 30.0, usia=30, jk="L", berat=100.0, tinggi=165.0),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["metabolic_risk_flag"] is True, "BMI 100/(1.65^2)=36.7 harus >= 30"
+    assert data["metabolic_risk_note"] is not None
+    assert data["visual_color"] == "green", "eskalasi default (R5) tidak boleh memengaruhi warna"
+
+
+def test_evidence_strength_reflects_injury_pattern(client):
+    """Test (R6/R5): evidence_strength='specific' utk senyawa berpola cedera
+    spesifik, 'none' utk fallback -- informatif saja, tidak memengaruhi warna."""
+    resp_specific = client.post("/api/v1/simulate", json=_payload("HT-HEPATOSELULER-TEST", 500.0))
+    resp_none = client.post("/api/v1/simulate", json=_payload("HT-VNO-SAFE-TEST", 500.0))
+    assert resp_specific.json()["evidence_strength"] == "specific"
+    assert resp_specific.json()["evidence_strength_note"] is not None
+    assert resp_none.json()["evidence_strength"] == "none"
+    assert resp_none.json()["evidence_strength_note"] is None
+
+
 def test_is_simulatable_false_rejected(client):
     """Test #6 (F8): senyawa is_simulatable=FALSE ditolak, tidak masuk fusi
     (DoD D9). Cakupan penuh 10 biologik ada di
