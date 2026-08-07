@@ -28,17 +28,17 @@ class AutocompleteResponse(BaseModel):
     total: int
     results: List[CompoundItem]
 
-# --- DTO Request & Response Simulasi PRD v2.0 ---
+# --- DTO Request & Response Simulasi PBPK PRD v2.3 ---
 
 class PatientCovariates(BaseModel):
-    usia: int = Field(..., ge=0, le=120, description="Usia pasien dalam tahun (0-120)")
+    usia: int = Field(..., ge=0, le=100, description="Usia pasien dalam tahun (0-100)")
     jenis_kelamin: Literal["L", "P"] = Field(..., description="Jenis kelamin pasien (L = Laki-laki, P = Perempuan)")
-    berat_badan_kg: float = Field(..., ge=1.0, le=350.0, description="Berat badan pasien dalam kg")
-    tinggi_badan_cm: float = Field(..., ge=30.0, le=250.0, description="Tinggi badan pasien dalam cm")
+    berat_badan_kg: float = Field(..., ge=1.0, le=350.0, allow_inf_nan=False, description="Berat badan pasien dalam kg")
+    tinggi_badan_cm: float = Field(..., ge=30.0, le=250.0, allow_inf_nan=False, description="Tinggi badan pasien dalam cm")
 
 class SimulationRequest(BaseModel):
     hepatwin_id: str = Field(..., description="Identifier senyawa dari autocomplete database tertutup")
-    dosis_mg: float = Field(..., gt=0.0, description="Dosis bolus obat dalam satuan mg")
+    dosis_mg: float = Field(..., gt=0.0, allow_inf_nan=False, description="Dosis bolus obat dalam satuan mg")
     covariates: PatientCovariates = Field(..., description="4 Kovariat fisik pasien untuk penskalaan alometrik")
 
 class TimeSeriesPBPKPoint(BaseModel):
@@ -59,19 +59,21 @@ class SimulationResponse(BaseModel):
     blinking_speed: Literal["none", "slow", "fast"] = Field(..., description="Kecepatan kedip hotspot WebGL")
     affected_segments: List[str] = Field(..., description="Daftar Segmen Couinaud terdampak (contoh: ['V', 'VI', 'VII', 'VIII'])")
     injury_pattern: str = Field(..., description="Pola cedera: Hepatocellular, Cholestatic, Mixed, atau Fallback/Diffuse")
-
-    # --- F4 (PROJECT_FUSION.md SS4.3): intensitas & mode hotspot dari lookup DB,
-    # TERPISAH dari warna/kedip (yang murni hasil fusi AI+PBPK). "dim" berarti
-    # bukti lokasi lemah, BUKAN risiko rendah -- lihat evidence_note.
-    hotspot_intensity: str = Field(..., description="Intensitas visual hotspot dari monograf LiverTox: high, low, atau dim")
-    hotspot_display_mode: str = Field(..., description="Mode tampilan hotspot: focal (segmen spesifik) atau diffuse (seluruh 8 segmen)")
-    evidence_note: Optional[str] = Field(
-        None,
-        description="Catatan netral bila pola cedera spesifik tidak tersedia di data kurasi (fallback difus redup); null bila ada monograf spesifik",
+    segment_mapping_type: Literal["PEDAGOGICAL_HEURISTIC"] = Field(
+        ..., description="Mapping segmen adalah heuristik pedagogis, bukan lokalisasi klinis."
+    )
+    segment_mapping_not_clinical_localization: Literal[True] = Field(
+        ..., description="Menegaskan mapping segmen bukan lokalisasi histologis klinis."
     )
     explainability_shap: List[str] = Field(..., description="Highlight gugus fungsi toxicophore kontributor DILI")
     cmax_hati: float = Field(..., description="Konsentrasi puncak obat di hati (mg/L)")
     auc_hati: float = Field(..., description="Area Under Curve konsentrasi obat di hati")
+    cmax_auc_ratio: float = Field(..., description="Alias backward-compatible untuk shape_ratio_h_inv (h^-1), bukan magnitude exposure")
+    shape_ratio_h_inv: float = Field(..., description="Rasio bentuk kurva Cmax/AUC dalam h^-1")
+    exposure_index: float = Field(..., description="log1p(Cmax hati) + log1p(AUC hati)")
+    exposure_category: Literal["LOW_EXPOSURE", "MODERATE_EXPOSURE", "HIGH_EXPOSURE"]
+    exposure_category_source: Literal["INTERNAL_DISTRIBUTIONAL_CALIBRATION"]
+    exposure_calibration_version: str
     time_series_pbpk: List[TimeSeriesPBPKPoint] = Field(..., description="Kurva konsentrasi C_hati(t) & C_plasma(t) 24 jam")
     disclaimer_permanent: str = Field(..., description="Medical Disclaimer resmi HepaTwin (ASME V&V 40)")
 
@@ -90,11 +92,30 @@ class SimulationResponse(BaseModel):
     )
     score_is_calibrated: Optional[bool] = Field(None, description="True bila dili_score sudah melalui kalibrator (C7)")
 
-    # --- F7 (gerbang K4, PROJECT_FUSION.md): perluasan kontrak backward-compatible ---
-    fusion_reason: str = Field(..., description="Sel matriks fusi yang terpakai, mis. 'AI_MID x LOW_EXPOSURE' (F3)")
-    exposure_category: str = Field(..., description="LOW_EXPOSURE, MODERATE_EXPOSURE, atau HIGH_EXPOSURE (F3/exposure_evaluator)")
-    thresholds_used: FusionThresholds = Field(..., description="Ambang T_low/T_high yang dipakai band AI pada simulasi ini (F2), utk transparansi/audit")
-    timing_ms: Optional[Dict[str, float]] = Field(
-        None,
-        description="Durasi per-tahap (ms) -- HANYA terisi bila settings.DEBUG aktif (F6); null di produksi",
-    )
+
+class PBPKDebugResponse(BaseModel):
+    BMI: float
+    metabolic_risk_flag: bool
+    clearance_multiplier_from_bmi: float
+    V_P_L: float
+    V_L_L: float
+    V_K_L: float
+    V_R_L: float
+    Q_C_L_h: float
+    Q_L_L_h: float
+    Q_K_L_h: float
+    Q_R_L_h: float
+    body_fat_percent_raw: float
+    body_fat_percent_clamped: float
+    xlogp_eff: float
+    Kp_R: float
+    Cl_met_L_h: float
+    Cl_renal_L_h: float
+    cmax_liver_mg_l: float
+    auc_liver_mg_h_l: float
+    cmax_auc_ratio: float
+    shape_ratio_h_inv: float
+    exposure_index: float
+    exposure_category: Literal["LOW_EXPOSURE", "MODERATE_EXPOSURE", "HIGH_EXPOSURE"]
+    exposure_category_source: Literal["INTERNAL_DISTRIBUTIONAL_CALIBRATION"]
+    exposure_calibration_version: str
