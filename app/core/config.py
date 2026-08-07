@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     PBPK_LIVER_VOLUME_FRACTION: float = 0.0257
     PBPK_KIDNEY_VOLUME_FRACTION: float = 0.0044
 
+    # F2 (gerbang K2/G4, PROJECT_FUSION.md SS4.2) -- ambang band AI dili_score
+    # utk matriks fusi 3x3 (F3). dili_score tidak berubah oleh upgrade Mesin A
+    # v2.3 (PROJECT_FUSION_V23.md SS3.5) -- nilai TIDAK dihitung ulang, hanya
+    # diuji ulang (R3). Default = metode (b) pemetaan-balik.
+    # [KEPUTUSAN AI -- PENDING REVIEW FARMASI + KETUA TIM, gerbang K2/G4]
+    FUSION_AI_T_LOW: float = 0.5458
+    FUSION_AI_T_HIGH: float = 0.6866
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

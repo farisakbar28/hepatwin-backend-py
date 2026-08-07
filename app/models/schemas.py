@@ -65,6 +65,15 @@ class SimulationResponse(BaseModel):
     segment_mapping_not_clinical_localization: Literal[True] = Field(
         ..., description="Menegaskan mapping segmen bukan lokalisasi histologis klinis."
     )
+    # --- F4 (PROJECT_FUSION.md SS4.3): intensitas & mode hotspot dari lookup DB,
+    # TERPISAH dari warna/kedip (yang murni hasil fusi AI+PBPK). "dim" berarti
+    # bukti lokasi lemah, BUKAN risiko rendah -- lihat evidence_note.
+    hotspot_intensity: str = Field(..., description="Intensitas visual hotspot dari monograf LiverTox: high, low, atau dim")
+    hotspot_display_mode: str = Field(..., description="Mode tampilan hotspot: focal (segmen spesifik) atau diffuse (seluruh 8 segmen)")
+    evidence_note: Optional[str] = Field(
+        None,
+        description="Catatan netral bila pola cedera spesifik tidak tersedia di data kurasi (fallback difus redup); null bila ada monograf spesifik",
+    )
     explainability_shap: List[str] = Field(..., description="Highlight gugus fungsi toxicophore kontributor DILI")
     cmax_hati: float = Field(..., description="Konsentrasi puncak obat di hati (mg/L)")
     auc_hati: float = Field(..., description="Area Under Curve konsentrasi obat di hati")
@@ -91,6 +100,14 @@ class SimulationResponse(BaseModel):
         None, description="Status model AI -- mencegah kebingungan model asli vs tidak ada"
     )
     score_is_calibrated: Optional[bool] = Field(None, description="True bila dili_score sudah melalui kalibrator (C7)")
+
+    # --- F7 (gerbang K4, PROJECT_FUSION.md): perluasan kontrak backward-compatible ---
+    fusion_reason: str = Field(..., description="Sel matriks fusi yang terpakai, mis. 'AI_MID x LOW_EXPOSURE' (F3)")
+    thresholds_used: FusionThresholds = Field(..., description="Ambang T_low/T_high yang dipakai band AI pada simulasi ini (F2), utk transparansi/audit")
+    timing_ms: Optional[Dict[str, float]] = Field(
+        None,
+        description="Durasi per-tahap (ms) -- HANYA terisi bila settings.DEBUG aktif (F6); null di produksi",
+    )
 
 
 class PBPKDebugResponse(BaseModel):

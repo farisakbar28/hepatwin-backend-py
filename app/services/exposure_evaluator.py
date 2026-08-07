@@ -5,8 +5,6 @@ from typing import Any, Dict
 from app.services import pbpk_calibration
 
 
-from app.core.config import settings
-
 class ExposureRiskLevel(str, Enum):
     LOW = "LOW_EXPOSURE"
     MODERATE = "MODERATE_EXPOSURE"

@@ -84,21 +84,23 @@ class SimulationOrchestrator:
             smiles
         )
 
-        # Task B: PBPK Solver (SciPy ODE + Alometrik)
+        # Task B: PBPK Solver (SciPy ODE + Alometrik, v2.3)
         cov = request.covariates
         pbpk_task = loop.run_in_executor(
             None,
+            _timed,
             self.pbpk_engine.simulate_with_diagnostics,
             request.dosis_mg,
             cov.usia,
             cov.jenis_kelamin,
             cov.berat_badan_kg,
             cov.tinggi_badan_cm,
-            compound.xlogp
+            compound.xlogp,
         )
 
-        # Tunggu luaran kedua mesin secara asinkron
-        dili_score, shap_detail, pbpk_result = await asyncio.gather(
+        # Tunggu luaran ketiga tugas secara asinkron
+        t_parallel_start = time.perf_counter()
+        (dili_score, t_ai), (shap_detail, t_shap), (pbpk_result, t_pbpk) = await asyncio.gather(
             ai_task, shap_task, pbpk_task
         )
         t_parallel_wall = time.perf_counter() - t_parallel_start
@@ -106,6 +108,7 @@ class SimulationOrchestrator:
 
         # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
         # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
+        t_exposure_start = time.perf_counter()
         exposure_result = ExposureEvaluatorService.evaluate_relative_exposure(
             cmax=pbpk_result.cmax_hati,
             auc=pbpk_result.auc_hati,
@@ -198,6 +201,9 @@ class SimulationOrchestrator:
             injury_pattern=injury_pattern,
             segment_mapping_type="PEDAGOGICAL_HEURISTIC",
             segment_mapping_not_clinical_localization=True,
+            hotspot_intensity=hotspot_intensity,
+            hotspot_display_mode=hotspot_display_mode,
+            evidence_note=evidence_note,
             explainability_shap=explainability_shap,
             cmax_hati=pbpk_result.cmax_hati,
             auc_hati=pbpk_result.auc_hati,
@@ -214,7 +220,6 @@ class SimulationOrchestrator:
             model_status=self.ai_engine.model_status,
             score_is_calibrated=self.ai_engine.score_is_calibrated,
             fusion_reason=fusion_result.fusion_reason,
-            exposure_category=exposure_result["risk_level"],
             thresholds_used=FusionThresholds(t_low=settings.FUSION_AI_T_LOW, t_high=settings.FUSION_AI_T_HIGH),
             timing_ms=timing_ms if settings.DEBUG else None,
         )
