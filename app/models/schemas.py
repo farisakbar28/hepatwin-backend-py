@@ -95,6 +95,18 @@ class SimulationResponse(BaseModel):
     evidence_strength: Literal["specific", "none"] = Field(..., description="'specific' bila injury_pattern bukti spesifik tersedia -- [PENDING G2] definisi 'strong evidence' belum diputuskan Farmasi, belum memengaruhi warna")
     evidence_strength_note: Optional[str] = Field(None, description="Catatan naratif bila evidence_strength='specific'; null bila 'none'")
 
+    # --- R6 (gerbang G3, PROJECT_FUSION_V23.md SS3.3): PRD v2.3 SS8.3.1 meminta
+    # mapping_confidence di kueri lookup, tapi kolom itu TIDAK ADA di database
+    # (kurasi Farmasi masih berjalan). Opsi default G3: turunkan PROKSI dari
+    # livertox_match_method (kolom yang memang ada), ditandai eksplisit sbg
+    # turunan sementara -- BUKAN kolom kurasi asli.
+    livertox_match_method: Optional[str] = Field(None, description="Metode pencocokan LiverTox dari kurasi internal (exact_name, salt_ester_normalized, dst); null bila no_match/tidak ada monograf")
+    mapping_confidence: Literal["high", "medium", "none"] = Field(..., description="Proksi kepercayaan pemetaan, diturunkan dari livertox_match_method -- lihat mapping_confidence_source")
+    mapping_confidence_source: Literal["DERIVED_PROXY_PENDING_G3"] = Field(
+        "DERIVED_PROXY_PENDING_G3",
+        description="Menegaskan mapping_confidence adalah proksi turunan aplikasi, BUKAN kolom kurasi asli (kolom itu belum ada di DB, gerbang G3)",
+    )
+
     time_series_pbpk: List[TimeSeriesPBPKPoint] = Field(..., description="Kurva konsentrasi C_hati(t) & C_plasma(t) 24 jam")
     disclaimer_permanent: str = Field(..., description="Medical Disclaimer resmi HepaTwin (ASME V&V 40)")
 

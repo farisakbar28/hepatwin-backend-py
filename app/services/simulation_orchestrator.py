@@ -16,6 +16,17 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+# R6 (gerbang G3): proksi mapping_confidence dari livertox_match_method --
+# kolom mapping_confidence yang diminta PRD v2.3 SS8.3.1 belum ada di DB.
+MAPPING_CONFIDENCE_PROXY = {
+    "exact_name": "high",
+    "salt_ester_normalized": "medium",
+    "leading_salt_normalized": "medium",
+    "spelling_variant_normalized": "medium",
+    "no_match": "none",
+}
+
+
 def _timed(fn, *args):
     """F6 (D7): jalankan `fn(*args)` di thread executor, ukur durasinya
     sendiri (bukan dari sisi caller) -- caller hanya melihat waktu
@@ -169,6 +180,10 @@ class SimulationOrchestrator:
             if evidence_strength == "specific" else None
         )
 
+        # C3. livertox_match_method + proksi mapping_confidence (R6, gerbang G3)
+        livertox_match_method = compound.livertox_match_method
+        mapping_confidence = MAPPING_CONFIDENCE_PROXY.get(livertox_match_method, "none")
+
         # D. Format Time Series Data
         ts_points = [
             TimeSeriesPBPKPoint(
@@ -233,6 +248,8 @@ class SimulationOrchestrator:
             metabolic_risk_note=metabolic_risk_note,
             evidence_strength=evidence_strength,
             evidence_strength_note=evidence_strength_note,
+            livertox_match_method=livertox_match_method,
+            mapping_confidence=mapping_confidence,
             time_series_pbpk=ts_points,
             disclaimer_permanent=disclaimer,
             shap_detail=shap_detail,
