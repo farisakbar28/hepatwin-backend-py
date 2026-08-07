@@ -16,6 +16,19 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+# R7 (gerbang G5, PRD v2.3 SS8.3.3): label siap-tampil -- "Aman/Berbahaya/
+# Kritis" tidak boleh berdiri sendiri. risk_level (low/medium/high) TIDAK
+# berubah, tetap enum teknis utk logika/frontend lama.
+RISK_LABEL_ID = {
+    "low": "Prioritas rendah (in-silico)",
+    "medium": "Prioritas sedang (in-silico)",
+    "high": "Prioritas tinggi (in-silico)",
+}
+RISK_LABEL_DISCLAIMER = (
+    "Warna dan label menunjukkan prioritas kajian in-silico, bukan keputusan terapi maupun klaim "
+    "keamanan klinis."
+)
+
 # R6 (gerbang G3): proksi mapping_confidence dari livertox_match_method --
 # kolom mapping_confidence yang diminta PRD v2.3 SS8.3.1 belum ada di DB.
 MAPPING_CONFIDENCE_PROXY = {
@@ -226,6 +239,8 @@ class SimulationOrchestrator:
             compound_name=compound.compound_name,
             dili_score=round(float(dili_score), 4),
             risk_level=risk_level,
+            risk_label_id=RISK_LABEL_ID[risk_level],
+            risk_label_disclaimer=RISK_LABEL_DISCLAIMER,
             visual_color=visual_color,
             blinking_speed=blinking_speed,
             affected_segments=affected_segments,

@@ -54,7 +54,17 @@ class SimulationResponse(BaseModel):
     hepatwin_id: str = Field(..., description="Identifier senyawa")
     compound_name: str = Field(..., description="Nama resmi senyawa (INN)")
     dili_score: float = Field(..., ge=0.0, le=1.0, description="Probabilitas DILI dari GATNN-DNN")
-    risk_level: Literal["low", "medium", "high"] = Field(..., description="Tingkat risiko: low, medium, high")
+    risk_level: Literal["low", "medium", "high"] = Field(..., description="Tingkat risiko: low, medium, high (enum teknis utk logika, TIDAK diubah -- lihat risk_label_id utk teks tampilan)")
+    # --- R7 (gerbang G5, PRD v2.3 SS8.3.3): "Aman/Berbahaya/Kritis" tidak boleh
+    # berdiri sendiri -- label siap-tampil wajib disediakan backend, bukan
+    # diterjemahkan sendiri oleh frontend dari risk_level.
+    risk_label_id: Literal["Prioritas rendah (in-silico)", "Prioritas sedang (in-silico)", "Prioritas tinggi (in-silico)"] = Field(
+        ..., description="Label siap-tampil sesuai PRD v2.3 SS8.3.3 -- gunakan ini di UI, JANGAN terjemahkan risk_level sendiri"
+    )
+    risk_label_disclaimer: str = Field(
+        ...,
+        description="Disclaimer wajib menyertai risk_label_id -- warna/label bukan keputusan terapi",
+    )
     visual_color: Literal["green", "yellow", "red"] = Field(..., description="Warna hotspot 3D WebGL")
     blinking_speed: Literal["none", "slow", "fast"] = Field(..., description="Kecepatan kedip hotspot WebGL")
     affected_segments: List[str] = Field(..., description="Daftar Segmen Couinaud terdampak (contoh: ['V', 'VI', 'VII', 'VIII'])")

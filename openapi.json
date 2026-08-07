@@ -1,0 +1,1177 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "HepaTwin Backend API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compounds/autocomplete": {
+      "get": {
+        "tags": [
+          "compounds"
+        ],
+        "summary": "Autocomplete Compounds",
+        "operationId": "autocomplete_compounds_api_v1_compounds_autocomplete_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Kata kunci nama obat/senyawa INN",
+              "title": "Q"
+            },
+            "description": "Kata kunci nama obat/senyawa INN"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutocompleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compounds/{hepatwin_id}": {
+      "get": {
+        "tags": [
+          "compounds"
+        ],
+        "summary": "Get Compound Detail",
+        "operationId": "get_compound_detail_api_v1_compounds__hepatwin_id__get",
+        "parameters": [
+          {
+            "name": "hepatwin_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hepatwin Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompoundDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulate": {
+      "post": {
+        "tags": [
+          "simulation"
+        ],
+        "summary": "Simulate Dili",
+        "operationId": "simulate_dili_api_v1_simulate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pbpk/debug": {
+      "get": {
+        "tags": [
+          "simulation"
+        ],
+        "summary": "Pbpk Debug",
+        "operationId": "pbpk_debug_api_v1_pbpk_debug_get",
+        "parameters": [
+          {
+            "name": "usia",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 0,
+              "default": 45,
+              "title": "Usia"
+            }
+          },
+          {
+            "name": "jenis_kelamin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(L|P)$",
+              "default": "L",
+              "title": "Jenis Kelamin"
+            }
+          },
+          {
+            "name": "berat_badan_kg",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 75.0,
+              "title": "Berat Badan Kg"
+            }
+          },
+          {
+            "name": "tinggi_badan_cm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 175.0,
+              "title": "Tinggi Badan Cm"
+            }
+          },
+          {
+            "name": "dosis_mg",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 100.0,
+              "title": "Dosis Mg"
+            }
+          },
+          {
+            "name": "xlogp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 2.0,
+              "title": "Xlogp"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PBPKDebugResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AutocompleteResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CompoundItem"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "total",
+          "results"
+        ],
+        "title": "AutocompleteResponse"
+      },
+      "CompoundDetail": {
+        "properties": {
+          "hepatwin_id": {
+            "type": "string",
+            "title": "Hepatwin Id",
+            "description": "ID unik senyawa pada database Hepatwin"
+          },
+          "compound_name": {
+            "type": "string",
+            "title": "Compound Name",
+            "description": "Nama INN / umum senyawa"
+          },
+          "dili_concern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dili Concern",
+            "description": "Kategori DILI (Most-DILI-Concern, Less-DILI-Concern, No-DILI-Concern)"
+          },
+          "is_simulatable": {
+            "type": "boolean",
+            "title": "Is Simulatable",
+            "description": "Status apakah senyawa dapat disimulasikan (is_simulatable = TRUE)",
+            "default": true
+          },
+          "ltkb_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltkb Id"
+          },
+          "cid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cid"
+          },
+          "canonical_smiles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Smiles"
+          },
+          "isomeric_smiles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isomeric Smiles"
+          },
+          "inchikey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inchikey"
+          },
+          "molecular_formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Molecular Formula"
+          },
+          "molecular_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Molecular Weight"
+          },
+          "tpsa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tpsa"
+          },
+          "xlogp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xlogp"
+          },
+          "injury_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Injury Pattern"
+          },
+          "segment_list": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment List"
+          },
+          "hotspot_base_intensity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotspot Base Intensity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hepatwin_id",
+          "compound_name"
+        ],
+        "title": "CompoundDetail"
+      },
+      "CompoundItem": {
+        "properties": {
+          "hepatwin_id": {
+            "type": "string",
+            "title": "Hepatwin Id",
+            "description": "ID unik senyawa pada database Hepatwin"
+          },
+          "compound_name": {
+            "type": "string",
+            "title": "Compound Name",
+            "description": "Nama INN / umum senyawa"
+          },
+          "dili_concern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dili Concern",
+            "description": "Kategori DILI (Most-DILI-Concern, Less-DILI-Concern, No-DILI-Concern)"
+          },
+          "is_simulatable": {
+            "type": "boolean",
+            "title": "Is Simulatable",
+            "description": "Status apakah senyawa dapat disimulasikan (is_simulatable = TRUE)",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "hepatwin_id",
+          "compound_name"
+        ],
+        "title": "CompoundItem"
+      },
+      "FusionThresholds": {
+        "properties": {
+          "t_low": {
+            "type": "number",
+            "title": "T Low",
+            "description": "Ambang dili_score band AI_LOW/AI_MID (F2, gerbang K2)"
+          },
+          "t_high": {
+            "type": "number",
+            "title": "T High",
+            "description": "Ambang dili_score band AI_MID/AI_HIGH (F2, gerbang K2)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t_low",
+          "t_high"
+        ],
+        "title": "FusionThresholds"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PBPKDebugResponse": {
+        "properties": {
+          "BMI": {
+            "type": "number",
+            "title": "Bmi"
+          },
+          "metabolic_risk_flag": {
+            "type": "boolean",
+            "title": "Metabolic Risk Flag"
+          },
+          "clearance_multiplier_from_bmi": {
+            "type": "number",
+            "title": "Clearance Multiplier From Bmi"
+          },
+          "V_P_L": {
+            "type": "number",
+            "title": "V P L"
+          },
+          "V_L_L": {
+            "type": "number",
+            "title": "V L L"
+          },
+          "V_K_L": {
+            "type": "number",
+            "title": "V K L"
+          },
+          "V_R_L": {
+            "type": "number",
+            "title": "V R L"
+          },
+          "Q_C_L_h": {
+            "type": "number",
+            "title": "Q C L H"
+          },
+          "Q_L_L_h": {
+            "type": "number",
+            "title": "Q L L H"
+          },
+          "Q_K_L_h": {
+            "type": "number",
+            "title": "Q K L H"
+          },
+          "Q_R_L_h": {
+            "type": "number",
+            "title": "Q R L H"
+          },
+          "body_fat_percent_raw": {
+            "type": "number",
+            "title": "Body Fat Percent Raw"
+          },
+          "body_fat_percent_clamped": {
+            "type": "number",
+            "title": "Body Fat Percent Clamped"
+          },
+          "xlogp_eff": {
+            "type": "number",
+            "title": "Xlogp Eff"
+          },
+          "Kp_R": {
+            "type": "number",
+            "title": "Kp R"
+          },
+          "Cl_met_L_h": {
+            "type": "number",
+            "title": "Cl Met L H"
+          },
+          "Cl_renal_L_h": {
+            "type": "number",
+            "title": "Cl Renal L H"
+          },
+          "cmax_liver_mg_l": {
+            "type": "number",
+            "title": "Cmax Liver Mg L"
+          },
+          "auc_liver_mg_h_l": {
+            "type": "number",
+            "title": "Auc Liver Mg H L"
+          },
+          "cmax_auc_ratio": {
+            "type": "number",
+            "title": "Cmax Auc Ratio"
+          },
+          "shape_ratio_h_inv": {
+            "type": "number",
+            "title": "Shape Ratio H Inv"
+          },
+          "exposure_index": {
+            "type": "number",
+            "title": "Exposure Index"
+          },
+          "exposure_category": {
+            "type": "string",
+            "enum": [
+              "LOW_EXPOSURE",
+              "MODERATE_EXPOSURE",
+              "HIGH_EXPOSURE"
+            ],
+            "title": "Exposure Category"
+          },
+          "exposure_category_source": {
+            "type": "string",
+            "const": "INTERNAL_DISTRIBUTIONAL_CALIBRATION",
+            "title": "Exposure Category Source"
+          },
+          "exposure_calibration_version": {
+            "type": "string",
+            "title": "Exposure Calibration Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "BMI",
+          "metabolic_risk_flag",
+          "clearance_multiplier_from_bmi",
+          "V_P_L",
+          "V_L_L",
+          "V_K_L",
+          "V_R_L",
+          "Q_C_L_h",
+          "Q_L_L_h",
+          "Q_K_L_h",
+          "Q_R_L_h",
+          "body_fat_percent_raw",
+          "body_fat_percent_clamped",
+          "xlogp_eff",
+          "Kp_R",
+          "Cl_met_L_h",
+          "Cl_renal_L_h",
+          "cmax_liver_mg_l",
+          "auc_liver_mg_h_l",
+          "cmax_auc_ratio",
+          "shape_ratio_h_inv",
+          "exposure_index",
+          "exposure_category",
+          "exposure_category_source",
+          "exposure_calibration_version"
+        ],
+        "title": "PBPKDebugResponse"
+      },
+      "PatientCovariates": {
+        "properties": {
+          "usia": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Usia",
+            "description": "Usia pasien dalam tahun (0-100)"
+          },
+          "jenis_kelamin": {
+            "type": "string",
+            "enum": [
+              "L",
+              "P"
+            ],
+            "title": "Jenis Kelamin",
+            "description": "Jenis kelamin pasien (L = Laki-laki, P = Perempuan)"
+          },
+          "berat_badan_kg": {
+            "type": "number",
+            "maximum": 350.0,
+            "minimum": 1.0,
+            "title": "Berat Badan Kg",
+            "description": "Berat badan pasien dalam kg"
+          },
+          "tinggi_badan_cm": {
+            "type": "number",
+            "maximum": 250.0,
+            "minimum": 30.0,
+            "title": "Tinggi Badan Cm",
+            "description": "Tinggi badan pasien dalam cm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usia",
+          "jenis_kelamin",
+          "berat_badan_kg",
+          "tinggi_badan_cm"
+        ],
+        "title": "PatientCovariates"
+      },
+      "SimulationRequest": {
+        "properties": {
+          "hepatwin_id": {
+            "type": "string",
+            "title": "Hepatwin Id",
+            "description": "Identifier senyawa dari autocomplete database tertutup"
+          },
+          "dosis_mg": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Dosis Mg",
+            "description": "Dosis bolus obat dalam satuan mg"
+          },
+          "covariates": {
+            "$ref": "#/components/schemas/PatientCovariates",
+            "description": "4 Kovariat fisik pasien untuk penskalaan alometrik"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hepatwin_id",
+          "dosis_mg",
+          "covariates"
+        ],
+        "title": "SimulationRequest"
+      },
+      "SimulationResponse": {
+        "properties": {
+          "hepatwin_id": {
+            "type": "string",
+            "title": "Hepatwin Id",
+            "description": "Identifier senyawa"
+          },
+          "compound_name": {
+            "type": "string",
+            "title": "Compound Name",
+            "description": "Nama resmi senyawa (INN)"
+          },
+          "dili_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Dili Score",
+            "description": "Probabilitas DILI dari GATNN-DNN"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk Level",
+            "description": "Tingkat risiko: low, medium, high (enum teknis utk logika, TIDAK diubah -- lihat risk_label_id utk teks tampilan)"
+          },
+          "risk_label_id": {
+            "type": "string",
+            "enum": [
+              "Prioritas rendah (in-silico)",
+              "Prioritas sedang (in-silico)",
+              "Prioritas tinggi (in-silico)"
+            ],
+            "title": "Risk Label Id",
+            "description": "Label siap-tampil sesuai PRD v2.3 SS8.3.3 -- gunakan ini di UI, JANGAN terjemahkan risk_level sendiri"
+          },
+          "risk_label_disclaimer": {
+            "type": "string",
+            "title": "Risk Label Disclaimer",
+            "description": "Disclaimer wajib menyertai risk_label_id -- warna/label bukan keputusan terapi"
+          },
+          "visual_color": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red"
+            ],
+            "title": "Visual Color",
+            "description": "Warna hotspot 3D WebGL"
+          },
+          "blinking_speed": {
+            "type": "string",
+            "enum": [
+              "none",
+              "slow",
+              "fast"
+            ],
+            "title": "Blinking Speed",
+            "description": "Kecepatan kedip hotspot WebGL"
+          },
+          "affected_segments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Segments",
+            "description": "Daftar Segmen Couinaud terdampak (contoh: ['V', 'VI', 'VII', 'VIII'])"
+          },
+          "injury_pattern": {
+            "type": "string",
+            "title": "Injury Pattern",
+            "description": "Pola cedera: Hepatocellular, Cholestatic, Mixed, atau Fallback/Diffuse"
+          },
+          "segment_mapping_type": {
+            "type": "string",
+            "const": "PEDAGOGICAL_HEURISTIC",
+            "title": "Segment Mapping Type",
+            "description": "Mapping segmen adalah heuristik pedagogis, bukan lokalisasi klinis."
+          },
+          "segment_mapping_not_clinical_localization": {
+            "type": "boolean",
+            "const": true,
+            "title": "Segment Mapping Not Clinical Localization",
+            "description": "Menegaskan mapping segmen bukan lokalisasi histologis klinis."
+          },
+          "hotspot_intensity": {
+            "type": "string",
+            "title": "Hotspot Intensity",
+            "description": "Intensitas visual hotspot dari monograf LiverTox: high, low, atau dim"
+          },
+          "hotspot_display_mode": {
+            "type": "string",
+            "title": "Hotspot Display Mode",
+            "description": "Mode tampilan hotspot: focal (segmen spesifik) atau diffuse (seluruh 8 segmen)"
+          },
+          "evidence_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Note",
+            "description": "Catatan netral bila pola cedera spesifik tidak tersedia di data kurasi (fallback difus redup); null bila ada monograf spesifik"
+          },
+          "explainability_shap": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Explainability Shap",
+            "description": "Highlight gugus fungsi toxicophore kontributor DILI"
+          },
+          "cmax_hati": {
+            "type": "number",
+            "title": "Cmax Hati",
+            "description": "Konsentrasi puncak obat di hati (mg/L)"
+          },
+          "auc_hati": {
+            "type": "number",
+            "title": "Auc Hati",
+            "description": "Area Under Curve konsentrasi obat di hati"
+          },
+          "cmax_auc_ratio": {
+            "type": "number",
+            "title": "Cmax Auc Ratio",
+            "description": "Alias backward-compatible untuk shape_ratio_h_inv (h^-1), bukan magnitude exposure"
+          },
+          "shape_ratio_h_inv": {
+            "type": "number",
+            "title": "Shape Ratio H Inv",
+            "description": "Rasio bentuk kurva Cmax/AUC dalam h^-1"
+          },
+          "exposure_index": {
+            "type": "number",
+            "title": "Exposure Index",
+            "description": "log1p(Cmax hati) + log1p(AUC hati)"
+          },
+          "exposure_category": {
+            "type": "string",
+            "enum": [
+              "LOW_EXPOSURE",
+              "MODERATE_EXPOSURE",
+              "HIGH_EXPOSURE"
+            ],
+            "title": "Exposure Category"
+          },
+          "exposure_category_source": {
+            "type": "string",
+            "const": "INTERNAL_DISTRIBUTIONAL_CALIBRATION",
+            "title": "Exposure Category Source"
+          },
+          "exposure_calibration_version": {
+            "type": "string",
+            "title": "Exposure Calibration Version"
+          },
+          "metabolic_risk_flag": {
+            "type": "boolean",
+            "title": "Metabolic Risk Flag",
+            "description": "BMI pasien >= 30 (indikator risiko metabolik) -- [PENDING G1] belum memengaruhi warna"
+          },
+          "metabolic_risk_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metabolic Risk Note",
+            "description": "Catatan naratif bila metabolic_risk_flag=True; null bila False"
+          },
+          "evidence_strength": {
+            "type": "string",
+            "enum": [
+              "specific",
+              "none"
+            ],
+            "title": "Evidence Strength",
+            "description": "'specific' bila injury_pattern bukti spesifik tersedia -- [PENDING G2] definisi 'strong evidence' belum diputuskan Farmasi, belum memengaruhi warna"
+          },
+          "evidence_strength_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Strength Note",
+            "description": "Catatan naratif bila evidence_strength='specific'; null bila 'none'"
+          },
+          "livertox_match_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Livertox Match Method",
+            "description": "Metode pencocokan LiverTox dari kurasi internal (exact_name, salt_ester_normalized, dst); null bila no_match/tidak ada monograf"
+          },
+          "mapping_confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "none"
+            ],
+            "title": "Mapping Confidence",
+            "description": "Proksi kepercayaan pemetaan, diturunkan dari livertox_match_method -- lihat mapping_confidence_source"
+          },
+          "mapping_confidence_source": {
+            "type": "string",
+            "const": "DERIVED_PROXY_PENDING_G3",
+            "title": "Mapping Confidence Source",
+            "description": "Menegaskan mapping_confidence adalah proksi turunan aplikasi, BUKAN kolom kurasi asli (kolom itu belum ada di DB, gerbang G3)",
+            "default": "DERIVED_PROXY_PENDING_G3"
+          },
+          "time_series_pbpk": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSeriesPBPKPoint"
+            },
+            "type": "array",
+            "title": "Time Series Pbpk",
+            "description": "Kurva konsentrasi C_hati(t) & C_plasma(t) 24 jam"
+          },
+          "disclaimer_permanent": {
+            "type": "string",
+            "title": "Disclaimer Permanent",
+            "description": "Medical Disclaimer resmi HepaTwin (ASME V&V 40)"
+          },
+          "shap_detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shap Detail",
+            "description": "Struktur lengkap C8: {method, groups:[{name,value,atom_indices}], atoms:[{idx,value}], smiles_used}"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version",
+            "description": "Versi model AI, mis. \"gatnn-dnn-fixmodel-v1\""
+          },
+          "model_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "trained",
+                  "unavailable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Status",
+            "description": "Status model AI -- mencegah kebingungan model asli vs tidak ada"
+          },
+          "score_is_calibrated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Is Calibrated",
+            "description": "True bila dili_score sudah melalui kalibrator (C7)"
+          },
+          "fusion_reason": {
+            "type": "string",
+            "title": "Fusion Reason",
+            "description": "Sel matriks fusi yang terpakai, mis. 'AI_MID x LOW_EXPOSURE' (F3)"
+          },
+          "thresholds_used": {
+            "$ref": "#/components/schemas/FusionThresholds",
+            "description": "Ambang T_low/T_high yang dipakai band AI pada simulasi ini (F2), utk transparansi/audit"
+          },
+          "timing_ms": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timing Ms",
+            "description": "Durasi per-tahap (ms) -- HANYA terisi bila settings.DEBUG aktif (F6); null di produksi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hepatwin_id",
+          "compound_name",
+          "dili_score",
+          "risk_level",
+          "risk_label_id",
+          "risk_label_disclaimer",
+          "visual_color",
+          "blinking_speed",
+          "affected_segments",
+          "injury_pattern",
+          "segment_mapping_type",
+          "segment_mapping_not_clinical_localization",
+          "hotspot_intensity",
+          "hotspot_display_mode",
+          "explainability_shap",
+          "cmax_hati",
+          "auc_hati",
+          "cmax_auc_ratio",
+          "shape_ratio_h_inv",
+          "exposure_index",
+          "exposure_category",
+          "exposure_category_source",
+          "exposure_calibration_version",
+          "metabolic_risk_flag",
+          "evidence_strength",
+          "mapping_confidence",
+          "time_series_pbpk",
+          "disclaimer_permanent",
+          "fusion_reason",
+          "thresholds_used"
+        ],
+        "title": "SimulationResponse"
+      },
+      "TimeSeriesPBPKPoint": {
+        "properties": {
+          "time": {
+            "type": "number",
+            "title": "Time",
+            "description": "Waktu simulasi (jam)"
+          },
+          "c_plasma": {
+            "type": "number",
+            "title": "C Plasma",
+            "description": "Konsentrasi plasma (mg/L)"
+          },
+          "c_hati": {
+            "type": "number",
+            "title": "C Hati",
+            "description": "Konsentrasi hati (mg/L)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time",
+          "c_plasma",
+          "c_hati"
+        ],
+        "title": "TimeSeriesPBPKPoint"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

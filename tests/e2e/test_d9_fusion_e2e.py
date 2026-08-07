@@ -81,6 +81,21 @@ def test_evidence_strength_reflects_injury_pattern(client):
     assert resp_none.json()["evidence_strength_note"] is None
 
 
+def test_risk_label_id_matches_risk_level(client):
+    """Test (R7, gerbang G5): risk_label_id label siap-tampil PRD v2.3
+    SS8.3.3 selalu sinkron dgn risk_level (tetap enum teknis, tidak diubah)."""
+    expected = {
+        "low": "Prioritas rendah (in-silico)",
+        "medium": "Prioritas sedang (in-silico)",
+        "high": "Prioritas tinggi (in-silico)",
+    }
+    resp = client.post("/api/v1/simulate", json=_payload("HT-001", 4000.0))
+    data = resp.json()
+    assert data["risk_label_id"] == expected[data["risk_level"]]
+    assert "bukan keputusan terapi" in data["risk_label_disclaimer"]
+    assert data["disclaimer_permanent"], "disclaimer_permanent lama harus tetap ada, bukan digantikan"
+
+
 def test_is_simulatable_false_rejected(client):
     """Test #6 (F8): senyawa is_simulatable=FALSE ditolak, tidak masuk fusi
     (DoD D9). Cakupan penuh 10 biologik ada di
