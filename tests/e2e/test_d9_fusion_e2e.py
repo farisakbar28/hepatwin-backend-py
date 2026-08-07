@@ -3,8 +3,6 @@ tests/conftest.py) + model AI/PBPK ASLI -- inferensi nyata, bukan mock, hanya
 lookup DB yang di-seed.
 """
 from app.core.config import settings
-from app.services.exposure_evaluator import ExposureRiskLevel
-from app.services.fusion_service import AiRiskBand, FusionService
 
 
 def _payload(hepatwin_id: str, dosis_mg: float, usia=40, jk="L", berat=70.0, tinggi=168.0) -> dict:
@@ -28,34 +26,31 @@ def test_acetaminophen_overdose_is_red(client):
     assert data["exposure_category"] == "HIGH_EXPOSURE"
 
 
-def test_vno_safe_compound_reaches_ai_low_band(client):
-    """Test #5 (F8): senyawa vNo-DILI-concern (Calcitonin salmon, skor
-    terendah katalog nyata F1) HARUS jatuh ke band AI_LOW -- membuktikan
-    perbaikan SS3.1 berlaku utk senyawa asli, bukan cuma nilai sintetis.
+def test_vno_safe_compound_reaches_green_end_to_end(client):
+    """Test #5 (F8, diperbarui R3 utk Mesin A v2.3): senyawa vNo-DILI-concern
+    (Calcitonin salmon, skor terendah katalog nyata F1) pada dosis wajar utk
+    pasien dewasa sehat HARUS menghasilkan HIJAU lewat PIPELINE PENUH (AI + PBPK
+    v2.3 + exposure_evaluator v2.3 + fusi) -- bukan lagi hanya pembuktian
+    struktural (unit test injeksi band).
 
-    \U0001F6A9 CATATAN JUJUR (F2, reports/F2_exposure_reachability_finding.md):
-    LOW_EXPOSURE praktis TIDAK TERJANGKAU utk kovariat pasien realistis manapun
-    (0/20.250 kombinasi tersweep) -- akar masalah di exposure_evaluator.py, di
-    luar cakupan fusion (gerbang K3, Farmasi). Karena itu HIJAU end-to-end
-    lewat dosis wajar TIDAK diuji di sini (akan gagal, BUKAN krn band AI salah
-    -- lihat test_fusion_matrix.py utk pembuktian struktural HIJAU via
-    injeksi band langsung). Test ini HANYA membuktikan band AI-nya benar;
-    lihat reports/F9_limitations_fusion.md utk status keseluruhan."""
+    RIWAYAT: di siklus v2.1 (`exposure_evaluator` berbasis `cmax_auc_ratio`,
+    lihat `reports/_v21_archive/F2_exposure_reachability_finding.md`),
+    skenario IDENTIK ini menghasilkan `HIGH_EXPOSURE` -- LOW_EXPOSURE praktis
+    tidak terjangkau (0/20.250 kombinasi realistis). Upgrade Mesin A ke v2.3
+    (`exposure_index` berbasis magnitude, bukan rasio) memperbaiki ini --
+    dibuktikan ulang scr empiris di R2 (`reports/R2_exposure_reachability_v23.md`,
+    43.41% kombinasi kini LOW_EXPOSURE) dan R3 (`reports/R3_uji_acuan_v23.md`,
+    pipeline penuh)."""
     resp = client.post("/api/v1/simulate", json=_payload("HT-VNO-SAFE-TEST", 50.0, usia=25, jk="P", berat=60.0, tinggi=165.0))
     assert resp.status_code == 200
     data = resp.json()
     assert data["dili_score"] < settings.FUSION_AI_T_LOW, (
         f"dili_score={data['dili_score']} seharusnya < T_low={settings.FUSION_AI_T_LOW} utk senyawa vNo skor terendah"
     )
-    # Pembuktian struktural: BILA exposure_category ini LOW_EXPOSURE, hasilnya HIJAU.
-    injected = FusionService.determine_visual_status(data["dili_score"], ExposureRiskLevel.LOW.value)
-    assert injected.visual_color == "green"
-    # Status ASLI saat ini (didokumentasikan, bukan diasumsikan) -- gagal jelas
-    # bila exposure_evaluator kelak direvisi Farmasi (K3), menandakan F9 perlu diperbarui.
-    assert data["exposure_category"] in ("MODERATE_EXPOSURE", "HIGH_EXPOSURE"), (
-        "exposure_category berubah dari yang didokumentasikan F2 -- perbarui reports/F9_limitations_fusion.md "
-        f"(nilai saat ini: {data['exposure_category']})"
-    )
+    assert data["exposure_category"] == "LOW_EXPOSURE"
+    assert data["visual_color"] == "green"
+    assert data["risk_level"] == "low"
+    assert data["fusion_reason"] == "AI_LOW x LOW_EXPOSURE"
 
 
 def test_is_simulatable_false_rejected(client):
