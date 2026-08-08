@@ -29,8 +29,9 @@ class TestKnownCompoundRelativeRisk:
     absolut (model boleh dilatih ulang secara sah tanpa membuat test rapuh)."""
 
     def test_paracetamol_scores_higher_than_ibuprofen(self, client):
-        resp_para = client.post("/api/v1/simulate", json=_valid_payload("HT-001"))  # Acetaminophen
-        resp_ibu = client.post("/api/v1/simulate", json=_valid_payload("HT-002"))  # Ibuprofen
+        # Q11: Use real IDs from export
+        resp_para = client.post("/api/v1/simulate", json=_valid_payload("HT0012"))  # Acetaminophen
+        resp_ibu = client.post("/api/v1/simulate", json=_valid_payload("HT0611"))   # Ibuprofen
         assert resp_para.status_code == 200
         assert resp_ibu.status_code == 200
 
@@ -52,7 +53,8 @@ class TestEdgeCasesWajib:
 
     def test_senyawa_is_simulatable_false_ditolak(self, client):
         """Senyawa biologik (is_simulatable=FALSE) -- ditolak, tidak masuk pipeline AI."""
-        resp = client.post("/api/v1/simulate", json=_valid_payload("HT-BIOLOGIC-001"))
+        # Q11: Use real biologic ID
+        resp = client.post("/api/v1/simulate", json=_valid_payload("HT0003")) # Abatacept
         assert resp.status_code == 422
         assert "biologik" in resp.json()["detail"].lower()
 
@@ -116,7 +118,7 @@ class TestReproducibility:
     """PRD: keluaran 100% konsisten -- dua panggilan input identik -> identik."""
 
     def test_repeated_calls_same_input_identical_score_and_shap(self, client):
-        payload = _valid_payload("HT-001")
+        payload = _valid_payload("HT0012")
         resp1 = client.post("/api/v1/simulate", json=payload)
         resp2 = client.post("/api/v1/simulate", json=payload)
 

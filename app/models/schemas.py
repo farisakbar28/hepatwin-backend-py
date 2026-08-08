@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any, Literal
 class CompoundItem(BaseModel):
     hepatwin_id: str = Field(..., description="ID unik senyawa pada database Hepatwin")
     compound_name: str = Field(..., description="Nama INN / umum senyawa")
-    dili_concern: Optional[str] = Field(None, description="Kategori DILI (Most-DILI-Concern, Less-DILI-Concern, No-DILI-Concern)")
+    dili_concern: Optional[str] = Field(None, description="Kategori DILI (vMost-DILI-concern, vLess-DILI-concern, vNo-DILI-concern, Ambiguous-DILI-concern)")
     is_simulatable: bool = Field(True, description="Status apakah senyawa dapat disimulasikan (is_simulatable = TRUE)")
 
 class CompoundDetail(CompoundItem):
@@ -37,7 +37,7 @@ class PatientCovariates(BaseModel):
     tinggi_badan_cm: float = Field(..., ge=30.0, le=250.0, allow_inf_nan=False, description="Tinggi badan pasien dalam cm")
 
 class SimulationRequest(BaseModel):
-    hepatwin_id: str = Field(..., description="Identifier senyawa dari autocomplete database tertutup")
+    hepatwin_id: str = Field(..., description="Identifier senyawa dari autocomplete database tertutup (format HTdddd)")
     dosis_mg: float = Field(..., gt=0.0, allow_inf_nan=False, description="Dosis bolus obat dalam satuan mg")
     covariates: PatientCovariates = Field(..., description="4 Kovariat fisik pasien untuk penskalaan alometrik")
 
@@ -54,7 +54,7 @@ class SimulationResponse(BaseModel):
     visual_color: Literal["green", "yellow", "red"] = Field(..., description="Warna hotspot 3D WebGL")
     blinking_speed: Literal["none", "slow", "fast"] = Field(..., description="Kecepatan kedip hotspot WebGL")
     affected_segments: List[str] = Field(..., description="Daftar Segmen Couinaud terdampak (contoh: ['V', 'VI', 'VII', 'VIII'])")
-    injury_pattern: str = Field(..., description="Pola cedera: Hepatocellular, Cholestatic, Mixed, atau Fallback/Diffuse")
+    injury_pattern: str = Field(..., description="Pola cedera: Hepatocellular, Cholestatic, Mixed, atau Fallback_Diffuse")
     segment_mapping_type: Literal["PEDAGOGICAL_HEURISTIC"] = Field(
         ..., description="Mapping segmen adalah heuristik pedagogis, bukan lokalisasi klinis."
     )
@@ -62,8 +62,10 @@ class SimulationResponse(BaseModel):
         ..., description="Menegaskan mapping segmen bukan lokalisasi histologis klinis."
     )
     explainability_shap: List[str] = Field(..., description="Highlight gugus fungsi toxicophore kontributor DILI")
-    cmax_hati: float = Field(..., description="Konsentrasi puncak obat di hati (mg/L)")
-    auc_hati: float = Field(..., description="Area Under Curve konsentrasi obat di hati")
+    cmax_liver_mg_l: float = Field(..., description="Konsentrasi puncak obat di hati (mg/L)")
+    auc_liver_mg_h_l: float = Field(..., description="Area Under Curve konsentrasi obat di hati")
+    cmax_hati: Optional[float] = Field(None, description="Alias backward-compatible untuk cmax_liver_mg_l")
+    auc_hati: Optional[float] = Field(None, description="Alias backward-compatible untuk auc_liver_mg_h_l")
     cmax_auc_ratio: float = Field(..., description="Alias backward-compatible untuk shape_ratio_h_inv (h^-1), bukan magnitude exposure")
     shape_ratio_h_inv: float = Field(..., description="Rasio bentuk kurva Cmax/AUC dalam h^-1")
     exposure_index: float = Field(..., description="log1p(Cmax hati) + log1p(AUC hati)")

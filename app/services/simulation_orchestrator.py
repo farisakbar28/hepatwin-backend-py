@@ -94,8 +94,8 @@ class SimulationOrchestrator:
         affected_segments: List[str] = []
 
         if compound.segment_list:
-            # Segment list disimpan sebagai koma terpisah, misal "V,VI,VII,VIII"
-            affected_segments = [s.strip() for s in compound.segment_list.split(",") if s.strip()]
+            # Segment list disimpan sebagai titik koma terpisah (Supabase ground truth), misal "V;VI;VII;VIII"
+            affected_segments = [s.strip() for s in compound.segment_list.split(";") if s.strip()]
         else:
             # Fallback jika tidak ada monograf spesifik -> Difus seluruh segmen
             affected_segments = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
@@ -131,6 +131,8 @@ class SimulationOrchestrator:
             segment_mapping_type="PEDAGOGICAL_HEURISTIC",
             segment_mapping_not_clinical_localization=True,
             explainability_shap=explainability_shap,
+            cmax_liver_mg_l=pbpk_result.cmax_hati,
+            auc_liver_mg_h_l=pbpk_result.auc_hati,
             cmax_hati=pbpk_result.cmax_hati,
             auc_hati=pbpk_result.auc_hati,
             cmax_auc_ratio=exposure_result["cmax_auc_ratio"],

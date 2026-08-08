@@ -29,8 +29,8 @@ class HepatwinCompound(Base):
 
     hepatwin_id: Mapped[str] = mapped_column(String, primary_key=True)
     ltkb_id: Mapped[Optional[str]] = mapped_column(String)
-    cid: Mapped[Optional[int]] = mapped_column(Integer)
-    compound_name: Mapped[str] = mapped_column(String, nullable=False)
+    cid: Mapped[Optional[int]] = mapped_column(Integer) # Note: export is bigint, SQLite Integer is OK for this range
+    compound_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     compound_name_normalized: Mapped[Optional[str]] = mapped_column(String)
     pubchem_title: Mapped[Optional[str]] = mapped_column(String)
 
@@ -40,7 +40,7 @@ class HepatwinCompound(Base):
     dili_concern_source: Mapped[Optional[str]] = mapped_column(String)
     dilirank_comment: Mapped[Optional[str]] = mapped_column(String)
     verification_status: Mapped[Optional[str]] = mapped_column(String)
-    is_simulatable: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_simulatable: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
     canonical_smiles: Mapped[Optional[str]] = mapped_column(Text)
     isomeric_smiles: Mapped[Optional[str]] = mapped_column(Text)

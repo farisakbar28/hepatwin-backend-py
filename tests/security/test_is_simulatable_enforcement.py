@@ -1,18 +1,18 @@
 import pytest
 from fastapi.testclient import TestClient
 
-# Daftar 10 senyawa biologik dari database testing (conftest.py)
+# Daftar 10 senyawa biologik nyata dari database (HTdddd)
 BIOLOGICS = [
-    {"id": "HT-BIOLOGIC-001", "name": "Infliximab"},
-    {"id": "HT-BIOLOGIC-002", "name": "Rituximab"},
-    {"id": "HT-BIOLOGIC-003", "name": "Adalimumab"},
-    {"id": "HT-BIOLOGIC-004", "name": "Epoetin alfa"},
-    {"id": "HT-BIOLOGIC-005", "name": "Insulin human"},
-    {"id": "HT-BIOLOGIC-006", "name": "Trastuzumab"},
-    {"id": "HT-BIOLOGIC-007", "name": "Bevacizumab"},
-    {"id": "HT-BIOLOGIC-008", "name": "Pembrolizumab"},
-    {"id": "HT-BIOLOGIC-009", "name": "Etanercept"},
-    {"id": "HT-BIOLOGIC-010", "name": "Daratumumab"},
+    {"id": "HT0003", "name": "Abatacept"},
+    {"id": "HT0004", "name": "Abciximab"},
+    {"id": "HT0019", "name": "Adalimumab"},
+    {"id": "HT0023", "name": "Agalsidase beta"},
+    {"id": "HT0029", "name": "Aldesleukin"},
+    {"id": "HT0031", "name": "Alemtuzumab"},
+    {"id": "HT0035", "name": "Alglucosidase alfa"},
+    {"id": "HT0044", "name": "Alteplase"},
+    {"id": "HT0072", "name": "Anakinra"},
+    {"id": "HT0076", "name": "Antithymocyte globulin"},
 ]
 
 @pytest.mark.security
@@ -76,7 +76,7 @@ def test_04_dataset_integrity(client: TestClient):
     Ini membuktikan 105 biologik tetap tersimpan utuh di basis data.
     """
     # 1. Pastikan ID fiktif mendapat 404
-    response_fake = client.get("/api/v1/compounds/HT-FIKTIF-999")
+    response_fake = client.get("/api/v1/compounds/HT-9999")
     assert response_fake.status_code == 404
     
     # 2. Pastikan ID biologik riil mendapat 422

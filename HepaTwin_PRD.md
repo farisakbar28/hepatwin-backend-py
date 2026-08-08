@@ -592,8 +592,7 @@ SELECT
     segment_list,
     injury_pattern,
     hotspot_base_intensity,
-    livertox_match_method,
-    mapping_confidence
+    livertox_match_method
 FROM
     hepatwin_compounds
 WHERE
@@ -603,7 +602,7 @@ WHERE
 - DILIrank 2.0 [14] menjadi sumber label DILI untuk 1.336 drug.
 - PubChem [15] menjadi sumber identitas/deskriptor kimia.
 - LiverTox [18] menjadi sumber narasi/pola cedera bila tersedia.
-- Kolom `segment_list`, `livertox_match_method`, dan `mapping_confidence` adalah **hasil kurasi internal HepaTwin**, bukan kolom asli DILIrank.
+- Kolom `segment_list` dan `livertox_match_method` adalah **hasil kurasi internal HepaTwin**, bukan kolom asli DILIrank.
 
 #### 2. Aturan Pemetaan Pola Cedera ke 8 Segmen Couinaud — heuristik visual, bukan lokalisasi klinis
 
@@ -1094,7 +1093,7 @@ Sebuah fitur atau modul dinyatakan selesai (**DONE**) apabila memenuhi seluruh k
 - [x] Endpoint `/api/v1/simulate` menerima payload input JSON yang tervalidasi skema Pydantic.
 - [x] Total waktu tanggap endpoint (inferensi AI + solver PBPK 24 jam) di bawah 5 detik.
 - [x] Sistem mengimplementasikan caching client-side dan offline lookup deterministik pada tabel `hepatwin_compounds` tanpa memanggil API eksternal saat runtime.
-- [x] Error handling yang rapi dengan HTTP status code 400 (Input Tidak Valid) dan 404 (Senyawa Tidak Simulatable / Di Luar Daftar).
+- [x] Error handling yang rapi dengan HTTP status code 422 (Unprocessable Entity - Biologik) dan 404 (Not Found - Di Luar Daftar).
 - [x] **[BARU v2.3]** Endpoint `GET /api/v1/pbpk/debug` return `V_L, Q_L, Cl, %BF, Kp_R, cmax, auc, ratio, exposure_category` untuk transparansi pakar/juri.
 
 ### 3. Modul AI Predictor (GATNN-DNN & SHAP)

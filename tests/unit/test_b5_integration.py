@@ -8,19 +8,19 @@ from app.repositories.compound_repository import CompoundRepository
 def test_get_compound_by_hepatwin_id_success():
     mock_db = MagicMock(spec=Session)
     mock_compound = HepatwinCompound(
-        hepatwin_id="HT-001",
+        hepatwin_id="HT0012",
         compound_name="Acetaminophen",
         compound_name_normalized="acetaminophen",
         is_simulatable=True,
-        dili_concern="Most-DILI-Concern"
+        dili_concern="vMost-DILI-concern"
     )
     mock_db.scalars.return_value.first.return_value = mock_compound
     
     repo = CompoundRepository(mock_db)
-    result = repo.get_compound_by_hepatwin_id("HT-001")
+    result = repo.get_compound_by_hepatwin_id("HT0012")
     
     assert result is not None
-    assert result.hepatwin_id == "HT-001"
+    assert result.hepatwin_id == "HT0012"
     assert result.compound_name == "Acetaminophen"
     assert result.is_simulatable is True
 
@@ -29,14 +29,14 @@ def test_get_compound_by_hepatwin_id_not_simulatable_or_not_found():
     mock_db.scalars.return_value.first.return_value = None
     
     repo = CompoundRepository(mock_db)
-    result = repo.get_compound_by_hepatwin_id("HT-BIOLOGIC-999")
+    result = repo.get_compound_by_hepatwin_id("HT0003")
     
     assert result is None
 
 def test_search_by_name_filter_simulatable():
     mock_db = MagicMock(spec=Session)
     mock_compound1 = HepatwinCompound(
-        hepatwin_id="HT-001",
+        hepatwin_id="HT0012",
         compound_name="Acetaminophen",
         compound_name_normalized="acetaminophen",
         is_simulatable=True
@@ -56,4 +56,4 @@ def test_operational_error_handling():
     
     repo = CompoundRepository(mock_db)
     with pytest.raises(OperationalError):
-        repo.get_compound_by_hepatwin_id("HT-001")
+        repo.get_compound_by_hepatwin_id("HT0012")

@@ -5,29 +5,12 @@ adalah model 4-kompartemen linear, bolus tunggal, selama 24 jam. Output PBPK
 adalah indeks paparan komputasional untuk riset/edukasi—bukan diagnosis,
 rekomendasi dosis, atau keputusan terapi.
 
-## Kontrak PBPK v2.3
+## Kontrak Supabase v2.3
 
-- Simulasi hanya menerima `hepatwin_id` dari katalog tertutup dengan
-  `is_simulatable = true`, dosis bolus tunggal, dan kovariat usia 0–100,
-  jenis kelamin, berat, serta tinggi.
-- Cmax/AUC dihitung oleh RK45. `cmax_auc_ratio` tetap tersedia hanya sebagai
-  alias kompatibilitas untuk `shape_ratio_h_inv`; ia bukan magnitude exposure.
-- Kategori paparan memakai `exposure_index = log1p(Cmax_L) + log1p(AUC_L)`
-  dan kuantil calibration internal yang dibekukan. Lihat
-  `reports/pbpk_exposure_calibration_v2_3.md`.
-- BMI >= 30 menghasilkan `metabolic_risk_flag` dan tidak memberi penalty
-  clearance otomatis.
-
-## Menjalankan
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Swagger tersedia pada `http://127.0.0.1:8000/docs`.
+- Katalog tertutup 1.336 senyawa (1.231 simulatable).
+- Format ID: `HTdddd` (misal `HT0012`).
+- Separator `segment_list`: titik koma (`;`).
+- Nilai `dili_concern`: raw canonical (misal `vMost-DILI-concern`).
 
 ## Endpoint PBPK
 
@@ -46,10 +29,16 @@ Swagger tersedia pada `http://127.0.0.1:8000/docs`.
 }
 ```
 
-Response meliputi `cmax_hati`, `auc_hati`, `cmax_auc_ratio`,
+Response meliputi `cmax_liver_mg_l`, `auc_liver_mg_h_l` (dengan alias `cmax_hati`, `auc_hati`),
 `shape_ratio_h_inv`, `exposure_index`, `exposure_category`, dan provenance
 calibration. `GET /api/v1/pbpk/debug` menampilkan seluruh parameter
 alometrik serta metrik PBPK untuk validasi pakar.
+
+## Batasan (Known Limitations)
+
+- Latensi request pertama `/simulate` ~8-10 detik (target PRD ≤5 s).
+- Threshold fusi 0.30/0.70 bersifat provisional (Bab 8.3).
+- Model PBPK Fase 1 adalah model linear bolus tunggal.
 
 ## Verifikasi
 
