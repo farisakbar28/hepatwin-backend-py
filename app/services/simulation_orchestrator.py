@@ -1,4 +1,3 @@
-import gc
 import logging
 import asyncio
 import sys
@@ -24,15 +23,19 @@ logger = logging.getLogger(__name__)
 
 def _trim_memory() -> None:
     """P3 (RAM diet Hobby 512 MB): kembalikan memori yang DITAHAN allocator
-    (numpy/torch/scipy) ke OS setelah komputasi berat -- tanpa ini RSS
-    terakumulasi lintas request (+128 MB setelah 5 senyawa berbeda) dan
-    mengetuk ambang OOM kill (502 + restart 60-100 dtk di live).
+    C (numpy/torch/scipy malloc arenas) ke OS setelah komputasi berat --
+    tanpa ini RSS terakumulasi lintas request (+128 MB setelah 5 senyawa
+    berbeda) dan mengetuk ambang OOM kill (502 + restart 60-100 dtk di live).
 
-    Linux-only: glibc malloc_trim(0) + gc.collect(); no-op aman di platform
-    lain. Kegagalan tidak boleh memengaruhi respons.
+    HANYA glibc malloc_trim(0) (Linux): gc.collect() TIDAK dipakai -- terukur
+    menambah ~260 ms/request (tracing GC atas objek torch/RDKit) padahal
+    drift RSS adalah retensi allocator C (malloc arenas), bukan sampah siklik
+    Python. `malloc_trim` pada glibc >=2.28 mengiterasi SEMUA arena (termasuk
+    arena thread executor tempat alokasi transient berat terjadi), jadi
+    dipanggil dari event-loop thread pun menjangkau memori drift. No-op aman
+    di platform lain; kegagalan tidak boleh memengaruhi respons.
     """
     try:
-        gc.collect()
         if sys.platform.startswith("linux"):
             import ctypes
 

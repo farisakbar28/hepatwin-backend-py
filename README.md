@@ -136,9 +136,10 @@ uvicorn app.main:app --reload
   `numba` TIDAK dipin di runtime (hemat ~21 MB; PBPK pakai fallback
   pure-Python, +23 ms tak relevan vs PRD 5 dtk), (2) atom-masking SHAP
   di-chunk 32 varian/forward (batasi puncak memori molekul besar seperti
-  Rifampin/Aprotinin), (3) `_trim_memory()` (gc + glibc `malloc_trim`,
-  Linux-only) setelah komputasi berat — cegah akumulasi RSS lintas request
-  (+128 MB setelah 5 senyawa berbeda), (4) explain LRU 10.000 → 2.048
+  Rifampin/Aprotinin),  (3) `_trim_memory()` (glibc `malloc_trim`, Linux-only) setelah komputasi
+  berat — cegah akumulasi RSS lintas request (+128 MB setelah 5 senyawa
+  berbeda; tanpa `gc.collect` yang terukur ~260 ms/request), (4) explain LRU
+  10.000 → 2.048
   (margin ekstra; footprint terukur ~10 MB utk 1.231 senyawa).
 - **Mapping Couinaud** adalah heuristik pedagogis makrovaskular
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
