@@ -4,6 +4,7 @@ import torch
 from hepatwin_ml.explain import (
     N_SMARTS,
     _exact_shapley,
+    _occlusion_fallback,
     _predict_with_smarts_mask,
     _smarts_atom_indices,
     atom_masking_attribution,
@@ -12,7 +13,7 @@ from hepatwin_ml.explain import (
 )
 from hepatwin_ml.features.fingerprints import dnn_feature_vector
 from hepatwin_ml.features.graph import smiles_to_graph
-from hepatwin_ml.features.smarts import SMARTS_PATTERNS
+from hepatwin_ml.features.smarts import SMARTS_PATTERNS, SMARTS_SLICE
 from hepatwin_ml.models.gatnn_dnn import GatnnDnn
 from rdkit import Chem
 
@@ -35,6 +36,34 @@ def test_shapley_efficiency_property():
     v_empty = _predict_with_smarts_mask(model, graph_data, base_fp, np.zeros(N_SMARTS))
 
     assert abs(phi.sum() - (v_full - v_empty)) < 1e-6
+
+
+def test_occlusion_fallback_matches_sequential_reference():
+    """P0: fallback occlusion ter-batch (`_batched_smarts_probs`) harus
+    identik dengan loop serial lama (v_full - v_except_i) dan 0 untuk fitur
+    SMARTS yang tidak match (kontribusi non-aktif == 0 EKSAK)."""
+    torch.manual_seed(0)
+    model = GatnnDnn()
+    model.eval()
+
+    smiles = "CC(=O)Nc1ccc(O)cc1"
+    mol = Chem.MolFromSmiles(smiles)
+    graph_data = smiles_to_graph(smiles)
+    base_fp = dnn_feature_vector(mol)
+
+    phi = _occlusion_fallback(model, graph_data, base_fp)
+    assert phi.shape == (N_SMARTS,)
+
+    v_full = _predict_with_smarts_mask(model, graph_data, base_fp, np.ones(N_SMARTS))
+    ref = np.zeros(N_SMARTS)
+    for i in range(N_SMARTS):
+        mask = np.ones(N_SMARTS)
+        mask[i] = 0.0
+        ref[i] = v_full - _predict_with_smarts_mask(model, graph_data, base_fp, mask)
+
+    assert np.allclose(phi, ref, atol=1e-6)
+    for i in np.flatnonzero(base_fp[SMARTS_SLICE] == 0):
+        assert phi[i] == 0.0
 
 
 def test_explain_smarts_contribution_returns_all_pattern_names(tmp_path):
@@ -153,3 +182,109 @@ def test_explain_atom_indices_consistent_with_smiles_used(tmp_path):
     for group in result["groups"]:
         assert all(0 <= idx < n_atoms for idx in group["atom_indices"])
     assert all(0 <= a["idx"] < n_atoms for a in result["atoms"])
+
+
+def test_smarts_cache_skips_recompute_on_second_call(monkeypatch):
+    """P2: cache in-memory LRU -- panggilan kedua dengan (model, inchikey) sama
+    TIDAK boleh menghitung ulang. `r1 == r2` saja tidak cukup membuktikan hit
+    (komputasi deterministik); di sini `_exact_shapley` di-patch agar raise
+    bila dipanggil LEBIH dari sekali."""
+    import hepatwin_ml.explain as explain_module
+
+    torch.manual_seed(0)
+    model = GatnnDnn()
+    model.eval()
+
+    original = explain_module._exact_shapley
+    calls = {"n": 0}
+
+    def guarded(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise AssertionError("_exact_shapley terpanggil lagi -- smarts cache tidak hit!")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(explain_module, "_exact_shapley", guarded)
+    explain_module.explain_smarts_contribution(
+        model, "CC(=O)Nc1ccc(O)cc1", "FAKE-INCHIKEY-CACHEHIT-SMARTS"
+    )
+    explain_module.explain_smarts_contribution(
+        model, "CC(=O)Nc1ccc(O)cc1", "FAKE-INCHIKEY-CACHEHIT-SMARTS"
+    )
+    assert calls["n"] == 1
+
+
+def test_explain_cache_skips_recompute_on_second_call(monkeypatch):
+    """P2: cache `explain()` (cache terpisah dari smarts) -- panggilan kedua
+    dengan (model, inchikey) sama TIDAK memanggil tahap komputasi apa pun
+    (gugus + atom di-patch agar raise bila dipanggil lagi)."""
+    import hepatwin_ml.explain as explain_module
+
+    torch.manual_seed(0)
+    model = GatnnDnn()
+    model.eval()
+
+    orig_smarts = explain_module.explain_smarts_contribution
+    orig_atoms = explain_module.atom_masking_attribution
+    calls = {"n": 0}
+
+    def guarded(fn):
+        def inner(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] > 2:  # tepat 2 pemanggilan pada panggilan explain() pertama
+                raise AssertionError("tahap hitung dipanggil lagi -- explain cache tidak hit!")
+            return fn(*args, **kwargs)
+        return inner
+
+    monkeypatch.setattr(explain_module, "explain_smarts_contribution", guarded(orig_smarts))
+    monkeypatch.setattr(explain_module, "atom_masking_attribution", guarded(orig_atoms))
+    explain_module.explain(
+        model, "CC(=O)Nc1ccc(O)cc1", "FAKE-INCHIKEY-CACHEHIT-EXPLAIN"
+    )
+    explain_module.explain(
+        model, "CC(=O)Nc1ccc(O)cc1", "FAKE-INCHIKEY-CACHEHIT-EXPLAIN"
+    )
+    assert calls["n"] == 2
+
+
+def test_cache_bounded_evicts_oldest_entry():
+    """P2: cache in-memory bounded LRU -- saat penuh, entri terlama ter-evict;
+    ukuran tidak pernah melebihi maxsize (diuji langsung via `_cache_set`,
+    tanpa komputasi model, sehingga cepat walau maxsize besar)."""
+    import hepatwin_ml.explain as explain_module
+    from hepatwin_ml.explain import _cache_get, _cache_key, _cache_set
+
+    torch.manual_seed(0)
+    model = GatnnDnn()
+    model.eval()
+
+    maxsize = explain_module._EXPLAIN_CACHE_MAXSIZE
+    assert maxsize > 0
+    try:
+        for i in range(maxsize + 1):
+            _cache_set(
+                explain_module._explain_cache,
+                explain_module._explain_cache_lock,
+                _cache_key(model, f"IK-BOUND-{i}"),
+                {"i": i},
+            )
+        assert len(explain_module._explain_cache) == maxsize
+        # entri terlama (IK-BOUND-0) ter-evict; entri terbaru tetap ada
+        assert (
+            _cache_get(
+                explain_module._explain_cache,
+                explain_module._explain_cache_lock,
+                _cache_key(model, "IK-BOUND-0"),
+            )
+            is None
+        )
+        assert _cache_get(
+            explain_module._explain_cache,
+            explain_module._explain_cache_lock,
+            _cache_key(model, f"IK-BOUND-{maxsize}"),
+        ) == {"i": maxsize}
+    finally:
+        # bersihkan entri test ini agar tidak bocor ke test lain (cache global)
+        with explain_module._explain_cache_lock:
+            for i in range(maxsize + 1):
+                explain_module._explain_cache.pop(_cache_key(model, f"IK-BOUND-{i}"), None)

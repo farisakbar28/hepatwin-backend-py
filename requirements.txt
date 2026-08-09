@@ -29,13 +29,21 @@ torch>=2.3.1
 torch-geometric>=2.5.3
 scipy>=1.13.1
 numpy>=2.0
-scikit-learn>=1.7.2
+scikit-learn==1.7.2
 cachetools>=5.3.3
+numba==0.66.0
 
 # scikit-learn: WAJIB untuk unpickle `app/models/calibrator_gatnn_dnn.pkl`
 # (hepatwin_ml.calibrate.Calibrator membungkus sklearn LogisticRegression;
-#  dibuat dengan sklearn 1.7.2). Tanpa sklearn di environment, kalibrator
-#  gagal dimuat dan dili_score tidak terkalibrasi.
+#  DIPIN ==1.7.2 = versi training kalibrator -- menghilangkan
+#  InconsistentVersionWarning dan menjaga reproduksibilitas persis). Tanpa
+#  sklearn di environment, kalibrator gagal dimuat dan dili_score tidak
+#  terkalibrasi.
+#
+# numba: akselerasi JIT utk `app/services/pbpk_engine.py` (solve_ivp
+#  4-kompartemen) -- DIPIN ==0.66.0 = versi benchmark F6 & ml/requirements.lock.txt
+#  (deterministik, cloud identik dgn angka terukur). Tanpa numba engine jatuh ke
+#  fallback pure-Python (aman, lebih lambat ~5-15x).
 # numpy>=2.0: app/services/pbpk_engine.py memakai np.trapezoid (baru ada
 #  sejak numpy 2.0; numpy 1.x akan crash saat runtime).
 
@@ -52,5 +60,6 @@ cachetools>=5.3.3
 #     dengan "Distribution not found at: file:///app/..." (file `.whl`
 #     tidak pernah sampai ke konteks build cloud).
 # Runtime cloud mengimpor `hepatwin_ml` langsung dari `ml/src` (murni .py,
-# selalu ikut ter-upload) melalui env var PYTHONPATH=/app/ml/src. Lokal:
+# selalu ikut ter-upload) via bootstrap `sys.path` di `app/main.py` (P2) --
+# platform menolak env var PYTHONPATH (HTTP 422). Lokal:
 # python -m pip install ./ml  (build source lokal stabil).

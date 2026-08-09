@@ -2,7 +2,6 @@ import pytest
 import time
 import math
 from app.services.pbpk_engine import PBPKEngine
-from app.services.allometric_service import AllometricService
 
 def test_pbpk_solver_mass_balance_and_convergence():
     """

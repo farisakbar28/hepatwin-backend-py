@@ -3,11 +3,14 @@ DAN tingkat ATOM (baru, PROJECT_FIX_MODEL.md SS4.4 / EXECUTION_PLAN_FIX_MODEL.md
 
 ## Tingkat gugus (grup, warisan upscale TU.11)
 
-Nilai Shapley EKSAK atas 9 fitur biner SMARTS_SLICE (2^9=512 koalisi), bukan
-KernelExplainer approksimasi -- untuk 9 fitur biner, eksak jauh lebih murah
-(ratusan forward pass kecil) dan tidak punya noise sampling. Fitur di luar
-SMARTS_SLICE (graf + MACCS + ECFP4) DITAHAN TETAP pada nilai molekul asli
-selama perhitungan -- yang dijelaskan murni kontribusi marjinal blok SMARTS.
+Nilai Shapley EKSAK atas 9 fitur biner SMARTS_SLICE, bukan KernelExplainer
+approksimasi (P0): enumerasi koalisi dibatasi ke fitur yang MATCH saja (2^k,
+k = jumlah fitur dengan base flag 1; fitur non-aktif -> phi 0 EKSAK) dan
+seluruh koalisi dihitung dalam SATU forward ter-batch (graph_branch sekali,
+lihat `_batched_smarts_probs`) -- hasil matematis IDENTIK dengan enumerasi
+2^9=512, tanpa noise sampling. Fitur di luar SMARTS_SLICE (graf + MACCS +
+ECFP4) DITAHAN TETAP pada nilai molekul asli selama perhitungan -- yang
+dijelaskan murni kontribusi marjinal blok SMARTS.
 
 ## Tingkat atom (BARU, C8)
 
@@ -25,12 +28,31 @@ pass (`Batch.from_data_list`) -- anggaran latensi C8 (<2 detik p95, 50
 molekul), bukan loop serial per atom seperti versi `master` lama di
 `app/services/ai_engine.py` (diperbaiki C10).
 
-Cache per InChIKey (molekul sama -> hasil sama, tidak dihitung ulang).
+Cache IN-MEMORY bounded LRU per (model, inchikey) (P2) -- pengganti file JSON
+`shap_cache.json`/`explain_cache.json` yang dibaca/ditulis penuh tiap request
+dan tumbuh tanpa batas. Bounded 10000 entri per cache, thread-safe; hilang
+saat proses restart (scale-to-zero) -- konsekuensi diterima mengingat
+komputasi kini cepat (P0) dan deterministik.
+
+Footprint terukur (P2, deep sizeof): entri `smarts` ~1.4 KB KONSTAN (9
+kontribusi + method + elapsed); entri `explain` ~1.7 KB overhead + ~240
+B/atom (parasetamol 11 atom = 4.3 KB; 60 atom = 15.4 KB; 100 atom = 25.2 KB).
+Pada maxsize 10000 (dua cache): ~14 MB (smarts) + ~50-100 MB (explain,
+molekul drug-like) -- aman untuk Hobby tier FastAPI Cloud 512 MB (model
+GATNN-DNN hanya 3.5 MB di disk; registry 1231 senyawa). Worst-case SEMUA
+entri molekul >=100 atom ~252 MB, tidak realistis untuk beban aktual
+(trafik rendah per README).
+
+Kunci cache memegang referensi kuat ke objek model (identitas objek). Dalam
+produksi hanya ada SATU shared model (singleton orchestrator) sehingga aman;
+di proses yang membuat banyak model (test), entri model lama baru dibuang
+setelah LRU penuh (10000) -- bounded, diterima.
 """
 import itertools
-import json
+import threading
 import time
-from pathlib import Path
+
+from cachetools import LRUCache
 
 import numpy as np
 import torch
@@ -48,13 +70,50 @@ _COMPILED_SMARTS = [Chem.MolFromSmarts(p.pattern) for p in SMARTS_PATTERNS]
 
 
 # ---------------------------------------------------------------------------
+# Cache in-memory bounded LRU (P2) -- pengganti file shap_cache/explain_cache
+# ---------------------------------------------------------------------------
+
+_EXPLAIN_CACHE_MAXSIZE = 10000
+_explain_cache: LRUCache = LRUCache(maxsize=_EXPLAIN_CACHE_MAXSIZE)
+_explain_cache_lock = threading.Lock()
+_smarts_cache: LRUCache = LRUCache(maxsize=_EXPLAIN_CACHE_MAXSIZE)
+_smarts_cache_lock = threading.Lock()
+
+
+def _cache_key(model, inchikey: str) -> tuple:
+    """Kunci cache: identitas objek model + InChIKey -- model berbeda (mis.
+    antar-test dengan bobot acak) TIDAK boleh berbagi entri cache."""
+    return (model, inchikey)
+
+
+def _cache_get(cache: LRUCache, lock: threading.Lock, key) -> dict | None:
+    """Baca cache thread-safe; cachetools memperbarui recency saat get (LRU)."""
+    with lock:
+        try:
+            return cache[key]
+        except KeyError:
+            return None
+
+
+def _cache_set(cache: LRUCache, lock: threading.Lock, key, value: dict) -> None:
+    """Tulis cache thread-safe; LRU meng-evict entri terlama bila penuh."""
+    with lock:
+        cache[key] = value
+
+
+# ---------------------------------------------------------------------------
 # Tingkat gugus (SMARTS) -- warisan upscale TU.11, tidak diubah
 # ---------------------------------------------------------------------------
 
 
 def _predict_with_smarts_mask(model: GatnnDnn, graph_data, base_fingerprint: np.ndarray, mask: np.ndarray) -> float:
     """base_fingerprint dgn blok SMARTS diganti (mask * nilai_asli) -- fitur di
-    luar SMARTS_SLICE tidak disentuh."""
+    luar SMARTS_SLICE tidak disentuh.
+
+    DIPERTAHANKAN walau jalur produksi kini memakai `_batched_smarts_probs`
+    (P0) -- fungsi ini masih diimpor langsung oleh `ml/tests/test_explain.py`
+    sebagai referensi serial utk verifikasi properti Shapley. JANGAN dihapus.
+    """
     fp = base_fingerprint.copy()
     fp[SMARTS_SLICE] = base_fingerprint[SMARTS_SLICE] * mask
     batch = Batch.from_data_list([graph_data])
@@ -64,45 +123,93 @@ def _predict_with_smarts_mask(model: GatnnDnn, graph_data, base_fingerprint: np.
     return torch.sigmoid(logit).item()
 
 
+def _batched_smarts_probs(model: GatnnDnn, graph_data, fingerprints: np.ndarray) -> np.ndarray:
+    """P0: probabilitas model utk N varian fingerprint dlm SATU forward ter-batch.
+
+    Eksak (bukan approksimasi): di `GatnnDnn.forward`, cabang graf
+    (`graph_branch`) TIDAK bergantung pada fingerprint -- hanya pada
+    x/edge_index/edge_attr. Jadi graph_repr dihitung SEKALI, lalu seluruh
+    varian cukup melewati `dnn_branch` + `head` (matmul batch kecil).
+    Sebelumnya tiap varian = SATU forward penuh model (exact Shapley 2^9=512
+    forward serial -> sumber tail ~9.5 detik, F9).
+    """
+    with torch.no_grad():
+        batch = torch.zeros(graph_data.x.shape[0], dtype=torch.long)
+        graph_repr = model.graph_branch(
+            graph_data.x, graph_data.edge_index, graph_data.edge_attr, batch
+        )
+        fp = torch.tensor(fingerprints, dtype=torch.float)
+        dnn_repr = model.dnn_branch(fp)
+        logits = model.head(
+            torch.cat([graph_repr.expand(len(fingerprints), -1), dnn_repr], dim=1)
+        )
+        return torch.sigmoid(logits.squeeze(-1)).numpy()
+
+
 def _exact_shapley(model: GatnnDnn, graph_data, base_fingerprint: np.ndarray) -> np.ndarray:
-    """Nilai Shapley eksak untuk 9 fitur SMARTS biner (2^9 = 512 koalisi)."""
+    """Nilai Shapley eksak untuk 9 fitur SMARTS biner (P0: matched-only + batched).
+
+    - HANYA fitur yang MATCH (base flag == 1) ikut enumerasi koalisi (2^k,
+      bukan 2^9). Phi utk fitur non-aktif == 0 EKSAK: base_i == 0 membuat
+      fp_i tak pernah berubah oleh mask apapun -> v(S∪{i}) == v(S), persis
+      properti null-player Shapley -- hasil IDENTIK dengan enumerasi 2^9.
+    - SEMUA 2^k koalisi dihitung dalam SATU forward ter-batch
+      (`_batched_smarts_probs`): graph_branch sekali, DNN/head untuk batch.
+    """
     from math import comb
 
     phi = np.zeros(N_SMARTS)
-    features = list(range(N_SMARTS))
-    value_cache: dict[tuple, float] = {}
+    active = [int(i) for i in np.flatnonzero(base_fingerprint[SMARTS_SLICE] > 0)]
+    k = len(active)
+    if k == 0:
+        return phi
 
-    def v(subset: frozenset) -> float:
-        if subset in value_cache:
-            return value_cache[subset]
+    # Enumerasi seluruh 2^k subset fitur aktif: urutan ∅, {a}, {b}, {ab}, ...
+    subset_list = list(itertools.chain.from_iterable(
+        itertools.combinations(active, r) for r in range(k + 1)
+    ))
+
+    # Matriks fingerprint [2^k, FINGERPRINT_DIM]: blok SMARTS = indikator
+    # keanggotaan subset; fitur non-SMARTS & non-aktif tetap pada nilai base.
+    fps = np.tile(base_fingerprint, (len(subset_list), 1))
+    for idx, sub in enumerate(subset_list):
         mask = np.zeros(N_SMARTS)
-        for idx in subset:
-            mask[idx] = 1.0
-        val = _predict_with_smarts_mask(model, graph_data, base_fingerprint, mask)
-        value_cache[subset] = val
-        return val
+        mask[list(sub)] = 1.0
+        fps[idx, SMARTS_SLICE] = base_fingerprint[SMARTS_SLICE] * mask
 
-    n = N_SMARTS
-    for i in features:
-        others = [f for f in features if f != i]
+    probs = _batched_smarts_probs(model, graph_data, fps)
+    v = {frozenset(sub): float(probs[idx]) for idx, sub in enumerate(subset_list)}
+
+    for feat in active:
+        others = [f for f in active if f != feat]
         for r in range(len(others) + 1):
-            weight = 1.0 / (n * comb(n - 1, r))
+            weight = 1.0 / (k * comb(k - 1, r))
             for combo in itertools.combinations(others, r):
                 s_without = frozenset(combo)
-                s_with = frozenset(combo) | {i}
-                phi[i] += weight * (v(s_with) - v(s_without))
+                s_with = frozenset(combo) | {feat}
+                phi[feat] += weight * (v[s_with] - v[s_without])
     return phi
 
 
 def _occlusion_fallback(model: GatnnDnn, graph_data, base_fingerprint: np.ndarray) -> np.ndarray:
-    """Fallback cepat O(n): kontribusi = v(semua fitur) - v(semua kecuali fitur i)."""
-    full_mask = np.ones(N_SMARTS)
-    v_full = _predict_with_smarts_mask(model, graph_data, base_fingerprint, full_mask)
+    """Fallback cepat O(k): kontribusi = v(semua fitur) - v(semua kecuali fitur i).
+
+    Hanya fitur yang MATCH diproses (fitur non-aktif -> 0 EKSAK, lihat
+    `_exact_shapley`). Ter-batch satu forward via `_batched_smarts_probs`.
+    """
     phi = np.zeros(N_SMARTS)
-    for i in range(N_SMARTS):
-        mask = full_mask.copy()
-        mask[i] = 0.0
-        phi[i] = v_full - _predict_with_smarts_mask(model, graph_data, base_fingerprint, mask)
+    active = [int(i) for i in np.flatnonzero(base_fingerprint[SMARTS_SLICE] > 0)]
+    if not active:
+        return phi
+
+    fps = np.tile(base_fingerprint, (len(active) + 1, 1))
+    for i, feat in enumerate(active):
+        mask = np.ones(N_SMARTS)
+        mask[feat] = 0.0
+        fps[i + 1, SMARTS_SLICE] = base_fingerprint[SMARTS_SLICE] * mask
+
+    probs = _batched_smarts_probs(model, graph_data, fps)
+    phi[active] = probs[0] - probs[1:]
     return phi
 
 
@@ -110,24 +217,36 @@ def explain_smarts_contribution(
     model: GatnnDnn,
     smiles: str,
     inchikey: str,
-    cache_path: str = "ml/data/interim/shap_cache.json",
+    cache_path: str | None = None,
+    mol: Chem.Mol | None = None,
+    graph_data: Data | None = None,
+    base_fingerprint: np.ndarray | None = None,
 ) -> dict:
     """SMILES (sudah distandardisasi) -> {nama_pola: nilai_kontribusi}.
 
     Kontribusi POSITIF berarti keberadaan pola tsb MENDORONG NAIK skor risiko
     DILI, NEGATIF berarti menekan turun. Skala: perubahan probabilitas model
     (bukan logit), jadi bisa dibandingkan lintas molekul.
-    """
-    cache_file = Path(cache_path)
-    cache: dict = {}
-    if cache_file.exists():
-        cache = json.loads(cache_file.read_text(encoding="utf-8"))
-    if inchikey in cache:
-        return cache[inchikey]
 
-    mol = Chem.MolFromSmiles(smiles)
-    graph_data = smiles_to_graph(smiles)
-    base_fingerprint = dnn_feature_vector(mol)
+    Cache: in-memory bounded LRU per (model, inchikey) (P2) -- hasil identik
+    tidak dihitung ulang. `cache_path` DIPERTAHANKAN hanya utk kompatibilitas
+    pemanggil lama; TIDAK lagi melakukan I/O file (deprecated, abaikan).
+    """
+    key = _cache_key(model, inchikey)
+    cached = _cache_get(_smarts_cache, _smarts_cache_lock, key)
+    if cached is not None:
+        return cached
+
+    # P0: terima featurization precomputed dari pemanggil (ai_engine._featurize)
+    # agar tidak dihitung ulang; hitung sendiri hanya bila tidak diberikan.
+    if mol is None:
+        mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        raise ValueError(f"explain_smarts_contribution(): gagal parse smiles={smiles!r}")
+    if graph_data is None:
+        graph_data = smiles_to_graph(smiles)
+    if base_fingerprint is None:
+        base_fingerprint = dnn_feature_vector(mol)
 
     t0 = time.time()
     phi = _exact_shapley(model, graph_data, base_fingerprint)
@@ -142,9 +261,7 @@ def explain_smarts_contribution(
         "elapsed_s": round(elapsed, 3),
         "contributions": {SMARTS_PATTERNS[i].name: round(float(phi[i]), 6) for i in range(N_SMARTS)},
     }
-    cache[inchikey] = result
-    cache_file.parent.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(json.dumps(cache, indent=0), encoding="utf-8")
+    _cache_set(_smarts_cache, _smarts_cache_lock, key, result)
     return result
 
 
@@ -165,7 +282,12 @@ def _smarts_atom_indices(mol: Chem.Mol) -> dict[str, list[int]]:
 # ---------------------------------------------------------------------------
 
 
-def atom_masking_attribution(model: GatnnDnn, smiles: str) -> list[dict]:
+def atom_masking_attribution(
+    model: GatnnDnn,
+    smiles: str,
+    graph_data: Data | None = None,
+    fingerprint: np.ndarray | None = None,
+) -> list[dict]:
     """SMILES (sudah distandardisasi) -> [{"idx": i, "value": delta}, ...].
 
     `value` = P(molekul utuh) - P(atom i dinolkan) -- POSITIF berarti atom
@@ -175,9 +297,14 @@ def atom_masking_attribution(model: GatnnDnn, smiles: str) -> list[dict]:
     Molekul tanpa ikatan (mis. ion tunggal, 1 atom) tetap valid -- ditangani
     otomatis oleh smiles_to_graph() (C3), tidak butuh percabangan khusus di sini.
     """
-    mol = Chem.MolFromSmiles(smiles)
-    graph_data = smiles_to_graph(smiles)
-    fingerprint = torch.tensor(dnn_feature_vector(mol), dtype=torch.float)
+    # P0: terima featurization precomputed (ai_engine._featurize) bila tersedia.
+    if graph_data is None or fingerprint is None:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            raise ValueError(f"atom_masking_attribution(): gagal parse smiles={smiles!r}")
+        graph_data = smiles_to_graph(smiles)
+        fingerprint = dnn_feature_vector(mol)
+    fp_tensor = torch.tensor(fingerprint, dtype=torch.float)
     n_atoms = graph_data.x.shape[0]
 
     # Varian 0 = molekul utuh (baseline); varian i+1 = atom i dinolkan.
@@ -188,7 +315,7 @@ def atom_masking_attribution(model: GatnnDnn, smiles: str) -> list[dict]:
         variants.append(Data(x=x_masked, edge_index=graph_data.edge_index, edge_attr=graph_data.edge_attr))
 
     batch = Batch.from_data_list(variants)
-    batch.fingerprint = fingerprint.unsqueeze(0).repeat(len(variants), 1)
+    batch.fingerprint = fp_tensor.unsqueeze(0).repeat(len(variants), 1)
 
     with torch.no_grad():
         probs = torch.sigmoid(model(batch)).numpy()
@@ -206,30 +333,46 @@ def explain(
     model: GatnnDnn,
     smiles_standardized: str,
     inchikey: str,
-    cache_path: str = "ml/data/interim/explain_cache.json",
+    cache_path: str | None = None,
+    mol: Chem.Mol | None = None,
+    graph_data: Data | None = None,
+    base_fingerprint: np.ndarray | None = None,
 ) -> dict:
     """Titik masuk tunggal C8/C10: SMILES terstandardisasi -> atribusi gugus +
-    atom dalam satu struktur, di-cache per InChIKey.
+    atom dalam satu struktur, di-cache in-memory per (model, inchikey).
 
     `atom_indices` (di dalam `groups`) merujuk ke indeks atom pada MOL yang
     diparse dari `smiles_standardized` -- sama dengan `smiles_used` yang
     disertakan di keluaran, supaya frontend menggambar dari string yang
     identik dengan yang dipakai menghitung atribusi (PROJECT_FIX_MODEL.md SS4.4).
-    """
-    cache_file = Path(cache_path)
-    cache: dict = {}
-    if cache_file.exists():
-        cache = json.loads(cache_file.read_text(encoding="utf-8"))
-    if inchikey in cache:
-        return cache[inchikey]
 
-    mol = Chem.MolFromSmiles(smiles_standardized)
+    Cache: in-memory bounded LRU (P2) -- `cache_path` DIPERTAHANKAN hanya utk
+    kompatibilitas pemanggil lama; TIDAK lagi melakukan I/O file (deprecated).
+    """
+    key = _cache_key(model, inchikey)
+    cached = _cache_get(_explain_cache, _explain_cache_lock, key)
+    if cached is not None:
+        return cached
+
+    # P0: terima featurization precomputed (ai_engine._featurize) bila tersedia;
+    # seluruh tahap (gugus + atom) memakai hasil yang SAMA (satu sumber).
+    if mol is None:
+        mol = Chem.MolFromSmiles(smiles_standardized)
     if mol is None:
         raise ValueError(f"explain(): gagal parse smiles_standardized={smiles_standardized!r}")
+    if graph_data is None:
+        graph_data = smiles_to_graph(smiles_standardized)
+    if base_fingerprint is None:
+        base_fingerprint = dnn_feature_vector(mol)
 
-    smarts_result = explain_smarts_contribution(model, smiles_standardized, inchikey)
+    smarts_result = explain_smarts_contribution(
+        model, smiles_standardized, inchikey,
+        mol=mol, graph_data=graph_data, base_fingerprint=base_fingerprint,
+    )
     atom_indices_by_group = _smarts_atom_indices(mol)
-    atoms = atom_masking_attribution(model, smiles_standardized)
+    atoms = atom_masking_attribution(
+        model, smiles_standardized, graph_data=graph_data, fingerprint=base_fingerprint,
+    )
 
     groups = [
         {
@@ -249,7 +392,5 @@ def explain(
         "smiles_used": smiles_standardized,
     }
 
-    cache[inchikey] = result
-    cache_file.parent.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(json.dumps(cache, indent=0), encoding="utf-8")
+    _cache_set(_explain_cache, _explain_cache_lock, key, result)
     return result

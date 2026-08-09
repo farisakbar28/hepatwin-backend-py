@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.core.database import get_db
+from app.repositories.compound_registry import get_registry
 from app.models.schemas import SimulationRequest
 from app.models.domain import HepatwinCompound
 import logging
@@ -19,9 +20,15 @@ async def verify_simulatable_compound(
     """
     hepatwin_id = request.hepatwin_id.strip()
     
-    # Kueri mentah untuk mendapatkan senyawa tanpa mempedulikan is_simulatable
-    stmt = select(HepatwinCompound).where(HepatwinCompound.hepatwin_id == hepatwin_id)
-    compound = db.scalars(stmt).first()
+    # P1: lookup via registry in-memory (nol query DB di hot path); fallback
+    # query DB bila registry belum dimuat (mis. TestClient tanpa startup).
+    registry = get_registry()
+    if registry is not None:
+        compound = registry.get(hepatwin_id)
+    else:
+        # Kueri mentah untuk mendapatkan senyawa tanpa mempedulikan is_simulatable
+        stmt = select(HepatwinCompound).where(HepatwinCompound.hepatwin_id == hepatwin_id)
+        compound = db.scalars(stmt).first()
 
     if not compound:
         # Jika benar-benar tidak ada di database (ID fiktif)

@@ -119,13 +119,18 @@ uvicorn app.main:app --reload
 - **Kategori exposure** memakai `P33/P66_EXPOSURE_INDEX` dari kalibrasi
   internal v2.3 (`reports/pbpk_exposure_calibration_v2_3.md`),
   `INTERNAL_DISTRIBUTIONAL_CALIBRATION` — bukan ambang klinis universal.
-- **Latensi:** cold boot proses ~5–7 detik (import torch/RDKit + load model;
-  biaya boot, bukan per-request). Request warm end-to-end ~1.9–2.3 detik
-  (target PRD ≤5 dtk). Di produksi (FastAPI Cloud **Hobby tier**), request
-  pertama setelah idle (scale-to-zero default) menambah cold start platform
-  (boot ulang + muat model) — bukan per-request. Tail latency SHAP pernah
-  teramati ~9.5 dtk pada satu run (belum tuntas; lihat
-  `reports/F9_limitations_fusion.md` §10).
+- **Latensi (diukur ulang pasca-P0–P3, lihat `reports/F6_latensi_d7.md` &
+  `reports/F6_cold_start_terisolasi.md`):** komputasi per-simulasi **p95
+  ~172 ms** (150 panggilan / 50 senyawa; request pertama setelah proses siap
+  ~40 ms) — jauh di bawah target PRD ≤5 dtk. Cache in-memory (explain LRU
+  10.000 + respons `/simulate` LRU 512, per input deterministik) melayani
+  request identik berulang dalam ~3 ms. SHAP di-batch + matched-only (P0):
+  p50 ~10 ms (sebelumnya tail hingga ~9,5 dtk, lihat
+  `reports/F9_limitations_fusion.md` §10). Ekor 11,9 dtk tersisa hanya untuk
+  satu senyawa ekstrem 454 atom (Aprotinin) — bukan pola sistematis. Di
+  produksi (FastAPI Cloud **Hobby tier**), request pertama setelah idle
+  (scale-to-zero default) menambah cold start platform (boot ulang + muat
+  model, ~9,4 dtk import+startup terukur) — bukan per-request.
 - **Mapping Couinaud** adalah heuristik pedagogis makrovaskular
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
   histologis klinis.

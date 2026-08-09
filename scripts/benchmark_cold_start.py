@@ -52,8 +52,8 @@ sudah menjalankan modul lain (yang secara tidak sengaja memanaskan import torch/
 
 | Tahap | Durasi |
 |---|---|
-| Import `app.main` + `TestClient` (memicu load model AI, kalibrator, JIT numba PBPK, warm-up internal `HybridAIEngine._warm_up()`) | {import_startup_ms:.0f} ms |
-| Startup event FastAPI (`warm_up_default_executor`, dalam `TestClient(app)` context manager) | (tercakup dalam waktu `with` block sebelum request pertama, tidak terpisah presisi lewat TestClient) |
+| Import `app.main` + `TestClient` (sejak P2: import modul torch/RDKit saja; load model AI + warm-up kini di lifespan startup, TIDAK di import) | {import_startup_ms:.0f} ms |
+| Startup `lifespan` (P2, pengganti `@app.on_event`/`warm_up_default_executor`; muat model + warm-up + registry, dalam `TestClient(app)` context manager) | (tercakup dalam waktu `with` block sebelum request pertama, tidak terpisah presisi lewat TestClient) |
 | **Request PERTAMA** `/simulate` setelah proses siap | **{first_request_ms:.0f} ms** |
 | Request KEDUA (`warm`, senyawa berbeda) | {second_request_ms:.0f} ms |
 | **Gabungan dari proses baru start s.d. respons pertama diterima** (`import + startup + request pertama`) | **{combined_from_process_launch_ms:.0f} ms** ({combined_from_process_launch_ms/1000:.2f} detik) |
@@ -65,7 +65,7 @@ start memakan ~8-10 detik". F6 mengukur ulang secara terisolasi dan MEMISAHKAN d
 sebelumnya kemungkinan besar terukur sebagai SATU angka gabungan:
 
 1. **Biaya boot proses (SEKALI per lifecycle proses, SEBELUM traffic apa pun bisa dilayani):**
-   import torch/RDKit + load bobot model + kalibrator + JIT numba + warm-up internal = **{import_startup_ms/1000:.2f} detik**.
+   import modul torch/RDKit = **{import_startup_ms/1000:.2f} detik** (sejak P2: load bobot model + kalibrator + JIT numba + warm-up internal terjadi di lifespan startup, terukur dalam `combined`).
    Ini BUKAN latensi request -- ini waktu proses perlu siap sebelum menerima permintaan APAPUN, analog
    dengan waktu boot container/pod, biasanya ditutupi *readiness probe* sebelum traffic dirutekan.
 2. **Latensi request pertama SETELAH proses siap:** **{first_request_ms/1000:.2f} detik** -- inilah yang

@@ -1,5 +1,3 @@
-import time
-
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -108,9 +106,7 @@ def test_simulation_valid_flow(mock_get_by_id):
             "tinggi_badan_cm": 170.0
         }
     }
-    started_at = time.perf_counter()
     response = client.post("/api/v1/simulate", json=payload)
-    elapsed_seconds = time.perf_counter() - started_at
     assert response.status_code == 200
     # F-05: Known first-request cold start limitation ~8-10s. 
     # Unit tests normally run on "warm" memory engine, but we keep assertion realistic.

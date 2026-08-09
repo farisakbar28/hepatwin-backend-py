@@ -4,12 +4,16 @@ import time
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from app.models.domain import HepatwinCompound
 from app.services.lookup_service import CompoundRepository
 from app.services.ai_engine import HybridAIEngine
 from app.services.pbpk_engine import PBPKEngine
 from app.services.exposure_evaluator import ExposureEvaluatorService
 from app.services.fusion_service import FusionService
+from app.services.simulation_cache import (
+    build_simulation_cache_key,
+    get_simulation_cached,
+    put_simulation_cached,
+)
 from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint, FusionThresholds
 from app.core.config import settings
 
@@ -45,6 +49,12 @@ class SimulationOrchestrator:
         pernah otomatis masuk response body (lihat F7 utk `timing_ms`
         tergerbang `settings.DEBUG`). Selalu di-log server-side lewat
         `logger.info` terlepas dari `timing_sink`.
+
+        P3 cache: respons penuh deterministik di-cache in-memory (LRU 512,
+        kunci = id + dosis + kovariat + fingerprint data senyawa). Pada cache
+        HIT, seluruh komputasi dilewati: `timing_sink` TIDAK diisi (pemanggil
+        instrumentasi -- benchmark F6 memakai kombinasi id/profil unik
+        sehingga tidak pernah terkena hit; d7 memakai id berbeda).
         """
         t_start = time.perf_counter()
 
@@ -65,6 +75,19 @@ class SimulationOrchestrator:
                 status_code=400,
                 detail=f"Senyawa '{compound.compound_name}' tidak memiliki struktur SMILES yang valid untuk disimulasikan."
             )
+
+        # P3: cache in-memory bounded LRU -- hasil DETERMINISTIK utk
+        # (senyawa, dosis, kovariat) yang sama; kunci menyertakan fingerprint
+        # data senyawa sehingga perubahan data/mock dgn ID sama tidak pernah
+        # melayani respons basi. Komputasi AI+SHAP+PBPK dilewati pada hit.
+        cache_key = build_simulation_cache_key(request, compound)
+        cached_response = get_simulation_cached(cache_key)
+        if cached_response is not None:
+            logger.info(
+                "simulation CACHE HIT hepatwin_id=%s dosis_mg=%s (AI+SHAP+PBPK dilewati)",
+                request.hepatwin_id, request.dosis_mg,
+            )
+            return cached_response
 
         # 2. EKSEKUSI PARALEL-ASINKRON (AI Predictor & PBPK Solver)
         # Menjalankan AI Inference & PBPK ODE Solver secara bersamaan via asyncio
@@ -197,7 +220,7 @@ class SimulationOrchestrator:
         if timing_sink is not None:
             timing_sink.update(timing_ms)
 
-        return SimulationResponse(
+        response = SimulationResponse(
             hepatwin_id=compound.hepatwin_id,
             compound_name=compound.compound_name,
             dili_score=round(float(dili_score), 4),
@@ -232,3 +255,6 @@ class SimulationOrchestrator:
             hotspot_display_mode=hotspot_display_mode,
             evidence_note=evidence_note,
         )
+        # P3: simpan respons ke cache in-memory (deterministik utk input sama).
+        put_simulation_cached(cache_key, response)
+        return response

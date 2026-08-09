@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -29,8 +30,11 @@ async def pbpk_debug(
     from app.services.exposure_evaluator import ExposureEvaluatorService
 
     engine = PBPKEngine()
-    result = engine.simulate_with_diagnostics(
-        dosis_mg, usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm, xlogp=xlogp
+    # P1: solve_ivp sinkron TIDAK boleh memblokir event loop di async def --
+    # offload ke thread pool via asyncio.to_thread.
+    result = await asyncio.to_thread(
+        engine.simulate_with_diagnostics,
+        dosis_mg, usia, jenis_kelamin, berat_badan_kg, tinggi_badan_cm, xlogp=xlogp,
     )
     params = result.parameters
     exposure_result = ExposureEvaluatorService.evaluate_relative_exposure(result.cmax_hati, result.auc_hati)

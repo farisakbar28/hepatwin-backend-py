@@ -96,11 +96,20 @@ def get_compound_detail(
         item = repo.get_compound_by_hepatwin_id(hepatwin_id)
         
         if not item:
-            # Periksa apakah ini adalah senyawa biologik
-            from sqlalchemy import select
-            from app.models.domain import HepatwinCompound
-            stmt = select(HepatwinCompound.is_simulatable).where(HepatwinCompound.hepatwin_id == hepatwin_id)
-            is_sim = db.scalar(stmt)
+            # P1: deteksi biologik via registry in-memory (nol query DB
+            # tambahan); fallback query DB bila registry belum dimuat.
+            from app.repositories.compound_registry import get_registry
+            registry = get_registry()
+            is_sim = None
+            if registry is not None:
+                candidate = registry.get(hepatwin_id)
+                if candidate is not None:
+                    is_sim = candidate.is_simulatable
+            else:
+                from sqlalchemy import select
+                from app.models.domain import HepatwinCompound
+                stmt = select(HepatwinCompound.is_simulatable).where(HepatwinCompound.hepatwin_id == hepatwin_id)
+                is_sim = db.scalar(stmt)
             
             if is_sim is not None and not is_sim:
                 raise HTTPException(

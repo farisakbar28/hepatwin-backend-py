@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, or_, func
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from app.models.domain import HepatwinCompound
+from app.repositories.compound_registry import get_registry, reset_registry
 from cachetools import TTLCache
 from cachetools.keys import hashkey
 import threading
@@ -17,6 +18,12 @@ _get_compound_cache = TTLCache(maxsize=2048, ttl=86400)
 _get_compound_lock = threading.Lock()
 
 def clear_caches():
+    # P1: registry in-memory ikut di-reset supaya test mendapat state bersih.
+    reset_registry()
+    # P3: respons /simulate yang di-cache ikut dibuang -- dipanggil saat data
+    # senyawa berubah (seed ulang DB di sesi test), cegah respons basi.
+    from app.services.simulation_cache import clear_simulation_cache
+    clear_simulation_cache()
     with _search_lock:
         _search_cache.clear()
     with _get_compound_lock:
@@ -43,8 +50,22 @@ class CompoundRepository:
             return None
 
         clean_id = hepatwin_id.strip()
-        key = hashkey(clean_id)
         is_mock = self._is_mock_db()
+
+        # P1: jalur cepat in-memory (registry dimuat saat startup) -- nol query
+        # DB di hot path. Registry menyimpan SEMUA baris (termasuk biologik),
+        # jadi filter is_simulatable diterapkan di sini, persis query SQL lama.
+        # Mock db (unit test) sengaja dilewati supaya jalur error-handling DB
+        # lama tetap teruji -- fast-path hanya untuk session DB nyata.
+        if not is_mock:
+            registry = get_registry()
+            if registry is not None:
+                compound = registry.get(clean_id)
+                if compound is None:
+                    return None
+                return compound if compound.is_simulatable else None
+
+        key = hashkey(clean_id)
         
         if not is_mock:
             try:
@@ -94,8 +115,17 @@ class CompoundRepository:
             return []
 
         clean_query = query.strip().lower()
-        key = hashkey(clean_query, limit)
         is_mock = self._is_mock_db()
+
+        # P1: jalur cepat in-memory -- replikasi deterministik query SQL lama
+        # (prefix/substring, filter is_simulatable, ordering) tanpa I/O DB.
+        # Mock db dilewati (lihat get_compound_by_hepatwin_id).
+        if not is_mock:
+            registry = get_registry()
+            if registry is not None:
+                return registry.search(query, limit=limit)
+
+        key = hashkey(clean_query, limit)
         
         if not is_mock:
             try:

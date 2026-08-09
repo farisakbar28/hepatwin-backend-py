@@ -16,8 +16,9 @@ ml/reports/C12_dokumentasi_model.md):
    (satu-satunya sumber, dipakai juga saat training), TIDAK didefinisikan
    ulang secara lokal di sini seperti versi lama (mencegah drift).
 
-Featurization/model/explainability diimpor dari `ml/` (`hepatwin_ml`, terpasang
-`-e ./ml` di `requirements.txt` root), BUKAN diduplikasi -- prinsip C10:
+Featurization/model/explainability diimpor dari `ml/` (`hepatwin_ml` dari
+`ml/src`, di-bootstrap `app/main.py` di cloud / `pip install ./ml` lokal),
+BUKAN diduplikasi -- prinsip C10:
 "Duplikasi kode fitur adalah sumber klasik ketidakcocokan training<->inferensi."
 
 Kebijakan statis (C9): model dimuat SEKALI di `__init__`, `model.eval()`
@@ -60,6 +61,15 @@ class HybridAIEngine:
     """
 
     def __init__(self, model_path: Optional[str] = None):
+        # P0 (RAM diet): instance CPU tunggal (FastAPI Cloud Hobby) -- torch
+        # default membuka 1 thread per core, mengarah ke oversubscription saat
+        # task AI‖SHAP‖PBPK berjalan konkuren di executor thread + footprint
+        # RAM ekstra per thread. Kunci jadi 1 thread SEBELUM model dimuat.
+        torch.set_num_threads(1)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:  # pragma: no cover -- hanya bila sudah ada kerja paralel
+            pass
         self.model_path = model_path
         self.device = torch.device("cpu")  # deployment tidak menjamin GPU tersedia
         self.model: Optional[GatnnDnn] = None
@@ -177,6 +187,20 @@ class HybridAIEngine:
             )
         return std
 
+    def _featurize(self, smiles: str) -> tuple:
+        """P0: standardize + featurisasi graph/fingerprint dipakai BERSAMA oleh
+        predict_dili_risk() DAN get_shap_detail() -- sebelumnya tiap fungsi
+        men-standardize + membangun graph + fingerprint sendiri (duplikasi
+        ~2-3x per request, didokumentasikan di benchmark F6 §3). Catatan:
+        `smiles_to_graph()` masih mem-parse SMILES secara internal (fungsi
+        training bersama, tidak diubah di P0).
+        Mengembalikan (std, mol, graph_data, fingerprint_np)."""
+        std = self._standardize_or_422(smiles)
+        mol = Chem.MolFromSmiles(std.canonical_smiles)
+        graph_data = smiles_to_graph(std.canonical_smiles)
+        fingerprint = dnn_feature_vector(mol)
+        return std, mol, graph_data, fingerprint
+
     def predict_dili_risk(self, smiles: str) -> float:
         """SMILES -> P(DILI) terkalibrasi (float, 0..1).
 
@@ -184,14 +208,10 @@ class HybridAIEngine:
         bila SMILES tidak valid -- TIDAK PERNAH diam-diam mengembalikan 0.5.
         """
         self._require_ready()
-        std = self._standardize_or_422(smiles)
-
-        graph_data = smiles_to_graph(std.canonical_smiles)
-        mol = Chem.MolFromSmiles(std.canonical_smiles)
-        fingerprint = torch.tensor(dnn_feature_vector(mol), dtype=torch.float).unsqueeze(0)
+        std, _mol, graph_data, fingerprint = self._featurize(smiles)
 
         batch = Batch.from_data_list([graph_data])
-        batch.fingerprint = fingerprint
+        batch.fingerprint = torch.tensor(fingerprint, dtype=torch.float).unsqueeze(0)
         with torch.no_grad():
             logit = self.model(batch)
             prob = torch.sigmoid(logit).item()
@@ -205,8 +225,13 @@ class HybridAIEngine:
         """SMILES -> keluaran `explain()` C8 penuh: method, groups (gugus
         SMARTS + atom_indices), atoms (atribusi per-atom), smiles_used."""
         self._require_ready()
-        std = self._standardize_or_422(smiles)
-        return explain(self.model, std.canonical_smiles, std.inchikey)
+        std, mol, graph_data, fingerprint = self._featurize(smiles)
+        # P0: featurization precomputed diteruskan ke explain() agar TIDAK
+        # di-parse/featurize ulang (dulu 2x lagi di dalam explain()).
+        return explain(
+            self.model, std.canonical_smiles, std.inchikey,
+            mol=mol, graph_data=graph_data, base_fingerprint=fingerprint,
+        )
 
     def get_explainability(self, smiles: str) -> List[str]:
         """Kompatibilitas mundur untuk `explainability_shap: List[str]`

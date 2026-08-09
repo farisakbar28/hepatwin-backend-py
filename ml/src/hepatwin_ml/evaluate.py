@@ -11,7 +11,6 @@ from sklearn.metrics import (
     f1_score,
     matthews_corrcoef,
     precision_score,
-    recall_score,
     roc_auc_score,
 )
 

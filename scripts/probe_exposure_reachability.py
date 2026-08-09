@@ -101,7 +101,7 @@ def main() -> None:
     lines.append(f"- `cmax_auc_ratio` minimum yang tercapai di seluruh sweep: **{min_ratio[0]:.4f}** pada (usia,tinggi,BMI,berat,jk,dosis/kg) = {min_ratio[1]}")
     lines.append(f"- `cmax_auc_ratio` maksimum: **{max_ratio[0]:.4f}** pada {max_ratio[1]}")
     lines.append(
-        f"- Ambang `moderate_threshold` yang harus dilewati agar LOW: **0.30** (non-vulnerable) / **0.20** (vulnerable, usia>=60 atau BMI>=30)\n"
+        "- Ambang `moderate_threshold` yang harus dilewati agar LOW: **0.30** (non-vulnerable) / **0.20** (vulnerable, usia>=60 atau BMI>=30)\n"
     )
 
     lines.append("## Akar sebab (diverifikasi lewat kode, bukan dugaan)\n")

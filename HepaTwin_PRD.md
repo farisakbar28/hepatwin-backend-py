@@ -267,7 +267,7 @@ Untuk menjamin keandalan klinis, kredibilitas komputasi, dan mencegah kebingunga
 
 - **NFR-01 (Kinerja Rendering 3D WebGL):** Rendering model 3D hati beserta animasi *blinking hotspot* harus berjalan lancar dengan frame rate minimal **30 FPS** pada peramban web modern tanpa menimbulkan lag pada perangkat desktop standar.
 
-- **NFR-02 (Waktu Respon Komputasi):** Total waktu proses dari permintaan simulasi dikirim hingga hasil inferensi GATNN-DNN dan penyelesaian ODE PBPK kembali ke klien tidak boleh melebihi **5 detik** (rata-rata target ≤ 3 detik). **PBPK saja ~0.1-0.3 detik (SciPy), AI ~0.5-1.5 detik; tail SHAP ditangani terpisah (lihat §11.2).**
+- **NFR-02 (Waktu Respon Komputasi):** Total waktu proses dari permintaan simulasi dikirim hingga hasil inferensi GATNN-DNN dan penyelesaian ODE PBPK kembali ke klien tidak boleh melebihi **5 detik** (rata-rata target ≤ 3 detik). **Terukur pasca-P0–P3 (F6, 150 panggilan/50 senyawa): p95 total ~172 ms — PBPK p50 ~19 ms, AI p50 ~16 ms, SHAP p50 ~10 ms (SHAP di-batch + matched-only, P0); request pertama setelah proses siap ~40 ms. Ekor 11,9 dtk tersisa hanya utk satu senyawa ekstrem 454 atom.**
 
 - **NFR-03 (Aksesibilitas, Keamanan & Offline Determinism):**
   - Sistem harus dapat diakses melalui web publik dengan protokol HTTPS penuh.
@@ -1101,7 +1101,7 @@ Sebuah fitur atau modul dinyatakan selesai (**DONE**) apabila memenuhi seluruh k
 - [x] Model `model_gatnn_dnn.pt` berjalan di dalam environment PyTorch/FastAPI dalam mode evaluasi (*forward pass*) tanpa *retraining* saat runtime.
 - [x] RDKit berhasil mengekstrak graf molekul dan sidik jari ECFP4 dari SMILES tersimpan tanpa gagal.
 - [x] Keluaran probabilitas hepatotoksisitas $P_{\text{DILI}}$ dan koordinat atom SHAP (*toxicophore*) tepat dan reprodusibel.
-- [ ] **[v2.3 — dari F9-1/10]** Ambang `FUSION_AI_T_LOW/HIGH` ditandai `[KEPUTUSAN AI -- PENDING K2]` (distribusional, bukan klinis) + SHAP tail latency <5 detik p95 atau fallback.
+- [x] **[v2.3 — dari F9-1/10]** Ambang `FUSION_AI_T_LOW/HIGH` ditandai `[KEPUTUSAN AI -- PENDING K2]` (distribusional, bukan klinis) + SHAP tail latency <5 detik p95 atau fallback (P0: SHAP batched+matched-only; ekor 11,9 dtk tersisa hanya utk satu senyawa 454 atom).
 
 ### 4. Modul PBPK Solver & Alometrik (SciPy ODE) — UPDATED v2.3
 

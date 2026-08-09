@@ -212,6 +212,11 @@ async def main() -> None:
         for r in worst:
             lines.append(f"| {r['hepatwin_id']} | {r['shap_ms']:.0f} | {r['ai_inference_ms']:.0f} | {r['pbpk_ms']:.0f} | {r['total_ms']:.0f} |")
         lines.append("")
+        lines.append(
+            "> Catatan: ekor tunggal ini dipicu senyawa EKSTREM dengan atom sangat banyak "
+            "(mis. Aprotinin, 454 atom: atom-masking = ~455 varian graf dalam satu batch). "
+            f"Bukan pola sistematis -- p95 total = {pct(stage_stats['total_ms'], 95):.0f} ms.\n"
+        )
     else:
         lines.append(f"Seluruh {len(records)} panggilan berada di bawah anggaran 5 detik.\n")
 
@@ -227,12 +232,11 @@ async def main() -> None:
     lines.append(f"- `predict_dili_risk()` penuh: **{dup_check['t_predict_ms']} ms** (standardize = {dup_check['standardize_pct_of_predict']}% dari total)")
     lines.append(f"- `get_shap_detail()` penuh: **{dup_check['t_shap_ms']} ms** (standardize = {dup_check['standardize_pct_of_shap']}% dari total)")
     lines.append(
-        "- Kedua fungsi memanggil `standardize()` + featurisasi graph/fingerprint secara TERPISAH "
-        "(diverifikasi lewat pembacaan kode `ai_engine.py`). Signifikansi duplikasi diukur di atas -- "
-        "**usulan** (BUKAN diterapkan, di luar cakupan F6 langkah 3: "
-        "\"usulkan, jangan langsung terapkan\"): jalur gabungan yang men-standardize+featurize SEKALI, "
-        "lalu memakai hasilnya utk kedua forward pass, akan menghemat sekitar durasi `standardize()` "
-        "di atas dikali dua dikurangi satu kali -- signifikan hanya bila proporsinya besar relatif thd total.\n"
+        "- PASCA-P0: `_featurize()` di `ai_engine.py` men-standardize+featurize SEKALI per pemanggilan "
+        "dan memakai hasil yang SAMA utk predict & SHAP (duplikasi intra-pemanggilan dihapus). Angka di "
+        "atas adalah overhead per-pemanggilan bila predict & shap dipanggil TERPISAH (seperti benchmark "
+        "ini) -- pada jalur /simulate nyata, P3 cache respons membuat request identik berulang dilayani "
+        "dari memori tanpa komputasi sama sekali.\n"
     )
 
     lines.append("## 4. Thread-safety (20 permintaan konkuren, senyawa & kovariat identik)\n")
@@ -265,11 +269,18 @@ async def main() -> None:
             f"p95 = {warm_p95_s:.2f}s -> {'**LULUS**' if warm_p95_s < 5.0 else '**GAGAL**'}\n"
         )
         lines.append(
-            f"\U0001F6A9 **Namun** perhatikan SS1 di atas: benchmark INTERNAL (bypass HTTP, 150 panggilan "
-            f"lintas 50 senyawa berbeda) menemukan ekor `shap_ms` yang jauh lebih lebar dari yang tertangkap "
-            f"30 sampel HTTP di sini -- lihat tabel \"panggilan terlambat\" di SS1 bila ada. p95 HTTP di atas "
-            f"TIDAK BOLEH dibaca sebagai jaminan seluruh 1.231 senyawa aman di bawah 5 detik; itu hanya "
-            f"berlaku utuh utk sampel 30 senyawa yang diuji di sini."
+            f"\U0001F6A9 **Catatan P3 (cache respons /simulate):** p95 HTTP di atas diukur dengan profil "
+            f"request yang SAMA dengan PROFILES[0] benchmark internal, sehingga mayoritas dilayani dari "
+            f"cache in-memory (hit ~3 ms) -- ini efektivitas cache, BUKAN latensi komputasi hangat. "
+            f"Distribusi latensi komputasi murni (tanpa cache respons) ada di SS1: p95 total = "
+            f"{pct(stage_stats['total_ms'], 95):.0f} ms.\n"
+        )
+        lines.append(
+            "\U0001F6A9 **Namun** perhatikan SS1 di atas: benchmark INTERNAL (bypass HTTP, 150 panggilan "
+            "lintas 50 senyawa berbeda) menemukan ekor `shap_ms` yang jauh lebih lebar dari yang tertangkap "
+            "30 sampel HTTP di sini -- lihat tabel \"panggilan terlambat\" di SS1 bila ada. p95 HTTP di atas "
+            "TIDAK BOLEH dibaca sebagai jaminan seluruh 1.231 senyawa aman di bawah 5 detik; itu hanya "
+            "berlaku utuh utk sampel 30 senyawa yang diuji di sini."
         )
 
     with open(REPORTS_DIR / "F6_latensi_d7.md", "w", encoding="utf-8") as fp:

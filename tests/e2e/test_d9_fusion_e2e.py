@@ -4,7 +4,7 @@ lookup DB yang di-seed.
 """
 from app.core.config import settings
 from app.services.exposure_evaluator import ExposureRiskLevel
-from app.services.fusion_service import AiRiskBand, FusionService
+from app.services.fusion_service import FusionService
 
 
 def _payload(hepatwin_id: str, dosis_mg: float, usia=40, jk="L", berat=70.0, tinggi=168.0) -> dict:
