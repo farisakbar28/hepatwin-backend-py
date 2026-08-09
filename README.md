@@ -10,7 +10,9 @@ rekomendasi dosis, atau keputusan terapi.
 - **API:** FastAPI + Pydantic v2 (Python 3.10+).
 - **AI:** PyTorch GATNN-DNN (inferensi statis, tanpa retraining runtime) +
   RDKit (graf molekul & ECFP4) — featurization/model/explain diimpor dari
-  paket `hepatwin-ml` (`ml/`, terpasang `./ml` non-editable).
+  paket `hepatwin-ml` (`ml/`, terpasang dari wheel pre-built
+  `ml/dist/hepatwin_ml-0.1.0-py3-none-any.whl`; rebuild setelah ubah
+  `ml/src`: `python -m pip wheel ./ml -w ml/dist`).
 - **Explainability:** atribusi tingkat gugus & atom (`hepatwin_ml.explain`,
   lihat `ml/reports/C8_shap.md`).
 - **PBPK:** SciPy `solve_ivp` (RK45) — 4 kompartemen linear, penskalaan

@@ -150,14 +150,17 @@ fastapi cloud env set DEBUG "false"
   dari index CPU sortir lebih tinggi dari versi plain PyPI. Ini menjaga ukuran
   instal & RAM tetap hemat (penting untuk tier gratis dengan resource
   terbatas) — verifikasi pasca-deploy: `torch.__version__` berakhiran `+cpu`.
-- `./ml` di `requirements.txt` meng-install paket `hepatwin-ml` dari
-  `ml/src` (dipakai `app/services/ai_engine.py`); `ml/` ikut ter-upload karena
-  berada dalam repo dan tidak di-ignore.
-  > ⚠️ Awalnya memakai `-e ./ml` (editable install), tetapi build cloud gagal
-  > dengan `error in 'egg_base' option: 'src' does not exist` — layout src
-  > (`packages.find where=["src"]`) + editable install tidak stabil di
-  > environment build cloud. Dipakai non-editable `./ml` (wheel biasa) yang
-  > terbukti build dengan pip maupun uv (Python 3.11 & 3.14).
+- `requirements.txt` meng-install paket `hepatwin-ml` dari **wheel
+  pre-built** `ml/dist/hepatwin_ml-0.1.0-py3-none-any.whl` (dipakai
+  `app/services/ai_engine.py`); `ml/` ikut ter-upload karena berada dalam
+  repo dan tidak di-ignore.
+  > ⚠️ Awalnya memakai `-e ./ml` (editable) lalu `./ml` (build source di
+  > cloud) — keduanya gagal di build cloud dengan `error in 'egg_base'
+  > option: 'src' does not exist` (layout src `packages.find where=["src"]`
+  > + build source tidak stabil di environment build cloud). Solusi: install
+  > **wheel pre-built** yang tidak memerlukan langkah build di cloud.
+  > Rebuild wheel setelah mengubah `ml/src`:
+  > `python -m pip wheel ./ml -w ml/dist`
 - Artefak model (`app/models/*.pt`, `*.pkl`) ter-track di git dan **tidak**
   di-ignore (`.gitignore` mengecualikan `*.pt` hanya di luar `app/models/`) →
   ikut ter-upload.
@@ -232,7 +235,7 @@ Repository** → hubungkan repo `hepatwin-backend-py`. Push ke branch default
 | Gejala | Kemungkinan penyebab | Perbaikan |
 |---|---|---|
 | `ai_engine_ready:false` / `503` | Artefak model gagal dimuat | Cek `AI_MODEL_PATH`; pastikan `app/models/*.pt` ter-track di git (bukan di-ignore) |
-| Import `hepatwin_ml` error | Paket `hepatwin-ml` gagal build / `ml/src` tidak ter-upload | Build non-editable (`./ml`) sudah diterapkan; pastikan `ml/src` ter-track di git dan tidak di-ignore — cek Logs untuk pesan error build |
+| Import `hepatwin_ml` error | Wheel `hepatwin_ml` tidak ditemukan / gagal install | Pastikan `ml/dist/hepatwin_ml-0.1.0-py3-none-any.whl` ter-track di git dan `requirements.txt` merujuk wheel tersebut; rebuild wheel bila `ml/src` berubah (`python -m pip wheel ./ml -w ml/dist`) |
 | `500` pada lookup | `DATABASE_URL` salah / tabel kosong | Cek koneksi + `sslmode=require`; verifikasi query §0 |
 | CORS `403` dari frontend | `BACKEND_CORS_ORIGINS` belum berisi origin Vercel | Set origin eksplisit (bukan `*`) |
 | `torch.__version__` tanpa `+cpu` | Resolver pip memilih wheel PyPI | Pin eksplisit `torch==<versi>+cpu` di `requirements.txt`, deploy ulang |

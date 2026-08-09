@@ -41,7 +41,10 @@ cachetools>=5.3.3
 
 # Featurization/model/explain untuk app/services/ai_engine.py (C10) diimpor
 # dari sini, BUKAN diduplikasi -- mencegah drift training<->inferensi.
-# Non-editable (bukan -e): editable install + layout src (packages.find
-# where=["src"]) gagal di build cloud FastAPI Cloud dengan error
-# "egg_base: src does not exist" -- wheel biasa terbukti stabil di pip/uv.
-./ml
+# Di-install dari wheel PRE-BUILT, BUKAN membangun dari source di cloud:
+# build source (editable maupun wheel) gagal di FastAPI Cloud dengan error
+# "egg_base: src does not exist" (layout src packages.find where=["src"]
+# + environment build cloud tidak bisa me-resolve direktori src relatif
+# CWD). Wheel py3-none-any ter-install tanpa langkah build. Rebuild wheel
+# setelah mengubah ml/src: python -m pip wheel ./ml -w ml/dist
+./ml/dist/hepatwin_ml-0.1.0-py3-none-any.whl
