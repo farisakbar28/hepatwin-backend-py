@@ -1,7 +1,7 @@
 # F9 -- Batasan & Keterbatasan Branch `fusion` (D7 & D9)
 
 Dokumen ini WAJIB dibaca sebelum mengklaim branch `fusion` "selesai" ke Ketua Tim, Farmasi, atau juri.
-Kejujuran di sini diprioritaskan di atas kesan sempurna -- sesuai prinsip kerja `PROJECT_FUSION.md` SS8.
+Kejujuran di sini diprioritaskan di atas kesan sempurna.
 
 ---
 
@@ -29,8 +29,7 @@ SS3.1, tapi di layer berbeda dan BELUM diperbaiki. `PBPKEngine` adalah ODE LINEA
 `cmax_hati` dan `auc_hati` dengan faktor yang SAMA, sehingga `cmax_auc_ratio` **matematis tidak
 bergantung pada dosis sama sekali**, hanya pada kovariat pasien. Sweep 20.250 kombinasi pasien+dosis
 realistis (usia 18-90, BMI 16-40, dosis 0.5-50 mg/kg) menghasilkan **0% LOW_EXPOSURE** -- kategori ini
-mati untuk kovariat pasien manapun yang diuji (`reports/F2_exposure_reachability_finding.md`,
-`reports/F5_audit_exposure.md`).
+mati untuk kovariat pasien manapun yang diuji (laporan F2/F5 internal task; ringkasan di dokumen ini).
 
 **Konsekuensi langsung:** karena matriks fusi (F3) memetakan `(AI_LOW, LOW_EXPOSURE) -> HIJAU`, dan
 `LOW_EXPOSURE` praktis tidak terjangkau, **HIJAU BELUM TERBUKTI TERCAPAI lewat skenario pasien nyata
@@ -64,6 +63,9 @@ didemonstrasikan ke juri dengan kovariat pasien apa pun.
 
 `dili_score` murni fungsi SMILES (struktur molekul) -- diverifikasi lewat F1 (1.231 forward pass,
 tidak ada parameter pasien yang masuk model AI). Personalisasi HANYA lewat jalur PBPK/`exposure_category`.
+> *Catatan pasca-merge master<->fusion:* paragraf berikut menggambarkan perilaku evaluator enam ambang
+> rasio LAMA; dengan kalibrasi kuantil v2.3 yang termerge, `LOW_EXPOSURE` kini terjangkau pada dosis
+> rendah (lihat ADENDUM di §3).
 Kombinasi dengan temuan SS3 di atas: karena `exposure_category` untuk sebagian besar skenario realistis
 adalah HIGH_EXPOSURE (F5: 52/60 kombinasi profil contoh), **jalur personalisasi pasien pun kehilangan
 sebagian besar variasinya** -- pada rentang dosis wajar, kovariat pasien seringkali tidak lagi mengubah
@@ -74,7 +76,9 @@ dan harus dinyatakan eksplisit ke juri, bukan dikaburkan.
 
 `30.0`/`10.0` mg/kg, `0.40`/`0.35`/`0.30`/`0.20` (rasio Cmax/AUC) TIDAK bersitasi -- Soejima et al. (2022)
 dan Ghabril et al. (2025) hanya mendukung KEBERADAAN modifikator usia>=60/BMI>=30, bukan nilai ambangnya.
-Ditandai `[ASUMSI DESAIN -- PENDING REVIEW FARMASI]` di `app/core/config.py` (F5), TIDAK diubah nilainya.
+> *Catatan pasca-merge master<->fusion:* enam ambang rasio ini telah digantikan evaluator v2.3 berbasis
+> kuantil `P33/P66_EXPOSURE_INDEX` (`reports/pbpk_exposure_calibration_v2_3.md`); ambang exposure
+> tersebut tetap di luar wewenang lapisan fusion (gerbang K3, review Farmasi).
 
 ## 6. Ambang warna AI (T_low/T_high) diturunkan dari distribusi katalog, bukan validasi klinis
 
@@ -114,27 +118,27 @@ identik) menghasilkan DUA run cepat konsisten (shap_ms max ~48-52ms) dan SATU ru
 UC-02). Akar sebab BELUM ditemukan -- dugaan (belum terverifikasi): kompilasi/alokasi tunda yang hanya
 terpicu molekul berukuran nyata (warm-up internal `HybridAIEngine._warm_up()` hanya memakai metana,
 1 atom). Di luar wewenang `fusion` untuk mendiagnosis lebih dalam (`hepatwin_ml.explain()`, Alur C sudah
-"selesai" per `PROJECT_FUSION.md` SS2). **Rekomendasi:** monitor `logger.info("F6 timing ...")` (sudah
+"selesai" per dokumen task). **Rekomendasi:** monitor `logger.info("F6 timing ...")` (sudah
 terpasang) di staging/produksi sebelum mengklaim p95 seluruh katalog 1.231 senyawa aman tanpa syarat.
 
 ## 11. Cold start proses (~5-7 detik) tetap ada, tapi BUKAN bagian anggaran per-request
 
-Direkonsiliasi dengan temuan lama `ml/reports/C12_limitations.md` (~8-10 detik): terurai jadi biaya boot
-proses SEKALI per lifecycle (import torch/RDKit + load model + JIT numba, ~5-7 detik, sebelum traffic
+Direkonsiliasi dengan temuan lama `ml/reports/C12_limitations.md` (~8-10 detik): terurai jadibiaya boot proses SEKALI per lifecycle (import torch/RDKit + load model + JIT numba, ~5-7 detik, sebelum traffic
 apa pun bisa dilayani) + request pertama SETELAH proses siap (~1.9-2.3 detik, DI BAWAH anggaran). Biaya
-boot tetap relevan operasional (waktu deploy/restart) tapi bukan bagian DoD D7 (`reports/F6_cold_start_terisolasi.md`).
+boot tetap relevan operasional (waktu deploy/restart) tapi bukan bagian DoD D7 (diukur via
+`scripts/benchmark_cold_start.py`).
 
-## 12. `PBPK_Engine_Audit_Report.md` tidak ditemukan di repository
+## 12. `PBPK_Engine_Audit_Report.md` (pembaruan 2026-08-09)
 
-`PROJECT_FUSION.md` SS2 merujuk dokumen ini sebagai audit yang sudah ada ("LULUS tanpa cacat"), tapi
-pencarian menyeluruh (`git log --all`, seluruh branch) TIDAK menemukan file ini di git history manapun.
-Kemungkinan dokumen ini ada di luar repo (Google Docs tim, dsb). **Adendum yang seharusnya ditambahkan
-ke dokumen tersebut** (SS3.1/SS3.2 sebagai koreksi cakupan, bukan pembatalan hasil LULUS) ditulis
-sebagai file terpisah: `reports/F9_addendum_pbpk_audit.md` -- WAJIB disalin ke dokumen aslinya oleh tim
-begitu lokasinya ditemukan.
+Saat penulisan laporan ini, `PBPK_Engine_Audit_Report.md` tidak ditemukan di git history -- diduga berada
+di luar repo (Google Docs tim, dsb). **Pembaruan:** dokumen tersebut kini ADA dan ter-track di root repo
+(`PBPK_Engine_Audit_Report.md`, berisi audit v2.3). Adendum "koreksi cakupan" (SS3.1/SS3.2 sebagai
+koreksi cakupan, bukan pembatalan hasil LULUS) telah **digabungkan ke dokumen tersebut** sebagai
+"§6. Adendum (2026-08-09)" per instruksi task.
 
 ## 13. Status gerbang K1-K6
 
-Lihat `reports/F9_laporan_d7_d9.md` bagian "Status gerbang keputusan" -- seluruhnya memakai default
-dokumen dan ditandai `[KEPUTUSAN AI -- PENDING REVIEW]`, kecuali K6 (tidak diterapkan, sesuai default).
-**K3 kini mendesak** (lihat SS3 di atas) -- bukan sekadar item basa-basi review.
+Seluruh keputusan gerbang memakai default dokumen dan ditandai `[KEPUTUSAN AI -- PENDING REVIEW]`,
+kecuali K6 (tidak diterapkan, sesuai default). **K3 kini mendesak** (lihat §3 di atas) -- bukan sekadar
+item basa-basi review; dengan kalibrasi v2.3 yang termerge, urgensi K3 berkurang namun review Farmasi
+tetap wajib (nilai P33/P66 dipertahankan apa adanya dari master).

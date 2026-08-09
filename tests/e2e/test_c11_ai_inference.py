@@ -1,5 +1,5 @@
 """C11 -- Unit test endpoint inferensi AI (POST /api/v1/simulate), tabel edge
-case wajib EXECUTION_PLAN_FIX_MODEL.md C11, uji reproduktibilitas, dan uji
+case wajib C11, uji reproduktibilitas, dan uji
 konsistensi training<->inferensi.
 
 Memakai `client` fixture (tests/conftest.py, SQLite in-memory seed) --

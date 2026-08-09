@@ -77,7 +77,7 @@ def test_get_explainability_backward_compatible_list_str(engine):
 
 
 def test_model_unavailable_raises_503_not_silent_fallback():
-    """Cacat #4 (PROJECT_FIX_MODEL.md SS5.2): TIDAK ADA return 0.5 diam-diam."""
+    """Cacat #4 (C10): TIDAK ADA return 0.5 diam-diam."""
     broken_engine = HybridAIEngine(model_path="app/models/__nonexistent_for_test__.pt")
     assert broken_engine.ready is False
     assert broken_engine.model_status == "unavailable"

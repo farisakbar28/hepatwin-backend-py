@@ -1,9 +1,9 @@
-"""F5 -- Analisis sensitivitas exposure_evaluator (PROJECT_FUSION.md SS3.4, SS3.5).
+"""F5 -- Analisis sensitivitas exposure_evaluator.
 
-Langkah 4 EXECUTION_PLAN_FUSION.md F5: "dari 1.231 senyawa pada beberapa profil
+Langkah 4 F5: "dari 1.231 senyawa pada beberapa profil
 pasien contoh, berapa yang jatuh ke LOW/MODERATE/HIGH?".
 
-Catatan metodologis penting (ditemukan di F2, `reports/F2_exposure_reachability_finding.md`):
+Catatan metodologis penting (ditemukan di F2, lihat reports/F9_limitations_fusion.md §3):
 `exposure_category` TIDAK bergantung pada identitas senyawa -- PBPKEngine
 generik untuk seluruh senyawa (ODE 4-kompartemen tidak memakai parameter
 farmakokinetik spesifik obat), rasio cmax/auc murni fungsi kovariat pasien.
@@ -103,7 +103,7 @@ def main() -> None:
         "(`[ASUMSI DESAIN -- PENDING REVIEW FARMASI]`, gerbang K3), sistem secara efektif berperilaku "
         "sebagai klasifikasi 2-kelas (MODERATE vs HIGH) untuk sebagian besar skenario realistis, bukan "
         "3-kelas seperti dirancang PRD. Tidak diubah di sini (logika dibekukan sampai keputusan Farmasi, "
-        "PROJECT_FUSION.md SS8 prinsip #9) -- dilaporkan apa adanya untuk `reports/F9_limitations_fusion.md`."
+        "prinsip #9) -- dilaporkan apa adanya untuk `reports/F9_limitations_fusion.md`."
     )
 
     out_path = REPORTS_DIR / "F5_audit_exposure.md"

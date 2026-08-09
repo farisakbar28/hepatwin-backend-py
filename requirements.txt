@@ -9,11 +9,17 @@ rdkit>=2023.9.5
 torch>=2.3.1
 torch-geometric>=2.5.3
 scipy>=1.13.1
-numpy>=1.26.4
-shap>=0.45.1
+numpy>=2.0
+scikit-learn>=1.7.2
 cachetools>=5.3.3
 
+# scikit-learn: WAJIB untuk unpickle `app/models/calibrator_gatnn_dnn.pkl`
+# (hepatwin_ml.calibrate.Calibrator membungkus sklearn LogisticRegression;
+#  dibuat dengan sklearn 1.7.2). Tanpa sklearn di environment, kalibrator
+#  gagal dimuat dan dili_score tidak terkalibrasi.
+# numpy>=2.0: app/services/pbpk_engine.py memakai np.trapezoid (baru ada
+#  sejak numpy 2.0; numpy 1.x akan crash saat runtime).
+
 # Featurization/model/explain untuk app/services/ai_engine.py (C10) diimpor
-# dari sini, BUKAN diduplikasi -- mencegah drift training<->inferensi
-# (EXECUTION_PLAN_FIX_MODEL.md C10 langkah 2).
+# dari sini, BUKAN diduplikasi -- mencegah drift training<->inferensi.
 -e ./ml

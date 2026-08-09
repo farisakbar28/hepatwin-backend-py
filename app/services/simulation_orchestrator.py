@@ -148,8 +148,8 @@ class SimulationOrchestrator:
             # Fallback jika tidak ada monograf spesifik -> Difus seluruh segmen
             affected_segments = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
 
-        # C. Intensitas & mode hotspot (F4, PROJECT_FUSION.md SS4.3) -- lookup DB
-        # murni ("di mana, dan seberapa kuat buktinya"), TIDAK memengaruhi
+        # C. Intensitas & mode hotspot (F4) -- lookup DB murni
+        # ("di mana, dan seberapa kuat buktinya"), TIDAK memengaruhi
         # warna/kedip (itu murni hasil fusion_result di atas, "seberapa berisiko").
         is_evidence_fallback = injury_pattern == "Tidak Terklasifikasi" or not compound.segment_list
         hotspot_intensity = compound.hotspot_base_intensity or "dim"

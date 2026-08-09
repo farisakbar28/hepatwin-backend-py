@@ -23,11 +23,11 @@ class Settings(BaseSettings):
     PBPK_LIVER_VOLUME_FRACTION: float = 0.0257
     PBPK_KIDNEY_VOLUME_FRACTION: float = 0.0044
 
-    # F2 (gerbang K2, PROJECT_FUSION.md SS4.2): ambang dili_score terkalibrasi
-    # utk band AI_LOW/AI_MID/AI_HIGH pada FusionService. Dipakai juga utk
+    # F2 (gerbang K2): ambang dili_score terkalibrasi utk band
+    # AI_LOW/AI_MID/AI_HIGH pada FusionService. Dipakai juga utk
     # `thresholds_used` di SimulationResponse (transparansi audit).
-    # Kandidat (b) "Pemetaan-balik" dari reports/F2_penurunan_ambang.md,
-    # dikunci oleh tests/unit/test_fusion_matrix.py.
+    # Diturunkan (metode b "pemetaan-balik") di reports/F2_penurunan_ambang.md
+    # dan dikunci oleh tests/unit/test_fusion_matrix.py.
     # [KEPUTUSAN AI -- PENDING REVIEW FARMASI, gerbang K2] Distribusional,
     # bukan ambang klinis.
     FUSION_AI_T_LOW: float = 0.5458

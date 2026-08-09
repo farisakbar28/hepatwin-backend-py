@@ -12,35 +12,20 @@ jawab Alur C dicatat di sini, bukan diperbaiki langsung.
 
 **Status: DIPERBAIKI.** Field PubChem lama telah dihapus dari schema dan endpoint. FE mengikuti kontrak baru.
 
-## 3. `compound_repository.py`: `get_compound_by_hepatwin_id` tidak menghormati dependency injection (TODO)
+## 3. `compound_repository.py`: `get_compound_by_hepatwin_id` tidak menghormati dependency injection (DIPERBAIKI)
 
-**Fakta:** `CompoundRepository.get_compound_by_hepatwin_id()` memanggil
-`_cached_get_compound()`, yang membuat **`SessionLocal()` baru sendiri**
-(`from app.core.database import SessionLocal` di dalam fungsi) alih-alih
-memakai `self.db` yang di-inject lewat constructor `CompoundRepository(db)`.
-Akibatnya: (a) test yang mem-mock `db` lewat constructor tidak pernah benar-benar
-memengaruhi jalur ini -- mock diam-diam diabaikan, permintaan sungguhan
-tetap jalan ke `SessionLocal()` asli; (b) hasil di-cache secara global
-(`_get_compound_cache`, TTL 24 jam, keyed hanya oleh `hepatwin_id`) LINTAS
-test/request apa pun dalam proses yang sama, termasuk lintas skenario test
-yang seharusnya terisolasi.
+**Fakta (saat ditemukan):** `CompoundRepository.get_compound_by_hepatwin_id()`
+memanggil `_cached_get_compound()`, yang membuat **`SessionLocal()` baru
+sendiri** alih-alih memakai `self.db` yang di-inject lewat constructor
+`CompoundRepository(db)`. Akibatnya mock `db` lewat constructor diabaikan dan
+hasil di-cache secara global lintas skenario test.
 
-**Dampak nyata:** `tests/unit/test_b5_integration.py::test_operational_error_handling`
-gagal (`DID NOT RAISE OperationalError`) karena mock `side_effect` pada
-`mock_db.scalars` tidak pernah tersentuh -- request sungguhan jalan duluan
-(dari test lain di file yang sama yang kebetulan memakai `hepatwin_id` yang
-sama, "HT-001") dan hasilnya (bukan exception) sudah ter-cache.
-
-**Kenapa tidak diperbaiki di sini:** `compound_repository.py` eksplisit ada
-di daftar terlarang `PROJECT_FIX_MODEL.md` §6 ("Mengubah logika autocomplete
-/ `compound_repository.py` / `lookup_service.py`"). Perbaikan yang benar
-(constructor injection dipakai konsisten, atau cache di-key dengan sesuatu
-yang membedakan sumber DB) adalah keputusan desain PIC Alur B/D, bukan
-tambalan satu baris yang aman diambil sepihak.
-
-**Status: TIDAK diperbaiki**, `tests/unit/test_b5_integration.py::test_operational_error_handling`
-tetap merah (1 dari 102 test backend) -- didokumentasikan di sini alih-alih
-disembunyikan.
+**Status: DIPERBAIKI.** Implementasi saat ini (`app/repositories/compound_repository.py`)
+memakai `self.db` (session yang di-inject) langsung untuk seluruh query
+`get_compound_by_hepatwin_id`/`search_by_name`, dan cache global di-clear oleh
+`tests/conftest.py` (`clear_caches`) antar sesi test. Test
+`tests/unit/test_b5_integration.py::test_operational_error_handling` kini
+hijau bersama seluruh suite.
 
 ## 4. `tests/unit/test_api.py`: override dependency FastAPI di level modul (bukan fixture) meracuni seluruh sesi pytest
 

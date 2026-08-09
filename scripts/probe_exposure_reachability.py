@@ -21,7 +21,7 @@ realistis (12-40) dan berbagai dosis relatif (mg/kg), untuk mengukur berapa
 persen kombinasi yang benar-benar mencapai LOW_EXPOSURE.
 
 TIDAK mengubah app/services/exposure_evaluator.py -- murni pengukuran
-(prinsip kerja #1 EXECUTION_PLAN_FUSION.md: jangan mengarang angka, ukur
+(prinsip kerja #1: jangan mengarang angka, ukur
 lewat eksekusi nyata).
 
 Jalankan dari root repo:
@@ -119,14 +119,14 @@ def main() -> None:
         "TIDAK PERNAH bisa diselamatkan oleh dosis rendah (`dose_per_kg < 10`) selama rasio pasien itu "
         "sendiri sudah di atas ambang -- dan dari sweep 20.250 kombinasi realistis di atas, **rasio "
         "SELALU di atas 0.30** (minimum terukur 0.3132, jauh di atas ambang non-vulnerable). Pola ini "
-        "**identik secara struktural** dengan temuan SS3.1 PROJECT_FUSION.md (rantai `or` yang membuat "
+        "**identik secara struktural** dengan temuan SS3.1 (rantai `or` yang membuat "
         "satu kondisi selalu menang) -- hanya saja terjadi di `exposure_evaluator.py`, bukan "
         "`fusion_service.py`, dan bukan pada `dili_score` tapi pada `cmax_auc_ratio`.\n"
     )
 
     lines.append("## Implikasi untuk cakupan branch `fusion`\n")
     lines.append(
-        "- Matriks 3x3 (F3, PROJECT_FUSION.md SS4.1) memetakan `(AI_LOW, EXP_LOW) -> HIJAU`. Bila "
+        "- Matriks 3x3 (F3) memetakan `(AI_LOW, EXP_LOW) -> HIJAU`. Bila "
         "`EXP_LOW` PRAKTIS TIDAK TERJANGKAU untuk kovariat pasien realistis manapun (terlepas dari "
         "kandidat T_low/T_high AI mana yang dipilih di F2), maka **HIJAU akan tetap kode mati** setelah "
         "F3 -- DoD proyek \"Hijau terbukti bisa muncul\" TIDAK akan terpenuhi lewat skenario pasien "
@@ -135,7 +135,7 @@ def main() -> None:
     lines.append(
         "- Ini BUKAN sesuatu yang bisa diperbaiki di lapisan fusi (F3) -- akar masalahnya ada di "
         "`exposure_evaluator.py` (enam ambang `30.0/10.0/0.40/0.35/0.30/0.20`), yang menurut "
-        "`PROJECT_FUSION.md` SS5 & gerbang K3 **berada di luar wewenang agen untuk diubah** tanpa "
+        "SS5 & gerbang K3 **berada di luar wewenang agen untuk diubah** tanpa "
         "keputusan Farmasi eksplisit. F5 (audit exposure_evaluator) SUDAH mencakup analisis sensitivitas "
         "serupa (langkah 4) -- temuan ini MENDAHULUI F5 secara organik karena ditemukan saat membangun uji "
         "acuan F2, dan sebaiknya jadi INPUT UTAMA diskusi K3 dengan Farmasi, bukan ditunda sampai F5/F9."

@@ -166,13 +166,3 @@ class CompoundRepository:
     # Alias untuk kompatibilitas mundur dengan test suite eksisting
     get_by_id = get_compound_by_hepatwin_id
     search_autocomplete = search_by_name
-
-def _cached_search_ids(query: str, limit: int) -> List[str]:
-    from app.core.database import SessionLocal
-    db = SessionLocal()
-    try:
-        repo = CompoundRepository(db)
-        compounds = repo.search_by_name(query, limit)
-        return [c.hepatwin_id for c in compounds]
-    finally:
-        db.close()

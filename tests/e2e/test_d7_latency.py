@@ -1,9 +1,8 @@
 """F8 -- Test suite latensi & konkurensi (D7). Lewat `client` fixture
 (tests/conftest.py) -- proses test sudah "warm" (pytest sudah menjalankan
 banyak test lain sebelumnya di sesi yang sama), sehingga TIDAK mengukur cold
-start (lihat scripts/benchmark_cold_start.py & reports/F6_cold_start_terisolasi.md
-utk itu) -- test ini murni menjaga DoD p95 warm end-to-end < 5 detik sbg
-regression guard di CI.
+start (lihat scripts/benchmark_cold_start.py utk itu) -- test ini murni
+menjaga DoD p95 warm end-to-end < 5 detik sbg regression guard di CI.
 """
 import asyncio
 import time
@@ -12,7 +11,7 @@ import numpy as np
 
 # 15 senyawa dari fixture conftest.py (ID kurasi Supabase asli -- cukup utk
 # regression guard CI yang cepat; benchmark menyeluruh 50 senyawa asli ada di
-# scripts/benchmark_simulation.py & reports/F6_latensi_d7.md).
+# scripts/benchmark_simulation.py).
 SAMPLE_IDS = [
     "HT0012", "HT0611", "HT0066", "HT0647", "HT0695",
     "HT1291", "HT0977", "HT0190", "HT0112", "HT0664",

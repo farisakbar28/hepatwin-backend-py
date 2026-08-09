@@ -82,8 +82,8 @@ class SimulationResponse(BaseModel):
     # --- C10 gerbang G6: perluasan kontrak API untuk SHAP tingkat atom ---
     # [KEPUTUSAN AI -- PENDING REVIEW KETUA TIM + FARIS] Optional dengan
     # default None -- backward-compatible, tidak memecah konsumen lama yang
-    # belum tahu field ini. Usulan skema di EXECUTION_PLAN_FIX_MODEL.md C10
-    # langkah 3.
+    # belum tahu field ini. Format keluaran dari hepatwin_ml.explain (C8,
+    # lihat ml/reports/C8_shap.md).
     shap_detail: Optional[Dict[str, Any]] = Field(
         None,
         description="Struktur lengkap C8: {method, groups:[{name,value,atom_indices}], atoms:[{idx,value}], smiles_used}",
@@ -94,9 +94,9 @@ class SimulationResponse(BaseModel):
     )
     score_is_calibrated: Optional[bool] = Field(None, description="True bila dili_score sudah melalui kalibrator (C7)")
 
-    # --- F4 (PROJECT_FUSION.md SS4.3): intensitas & mode hotspot dari lookup DB,
-    # TERPISAH dari warna/kedip (yang murni hasil fusi AI+PBPK). "dim" berarti
-    # bukti lokasi lemah, BUKAN risiko rendah -- lihat evidence_note.
+    # --- F4: intensitas & mode hotspot dari lookup DB, TERPISAH dari
+    # warna/kedip (yang murni hasil fusi AI+PBPK). "dim" berarti bukti lokasi
+    # lemah, BUKAN risiko rendah -- lihat evidence_note.
     hotspot_intensity: str = Field(..., description="Intensitas visual hotspot dari monograf LiverTox: high, low, atau dim")
     hotspot_display_mode: str = Field(..., description="Mode tampilan hotspot: focal (segmen spesifik) atau diffuse (seluruh 8 segmen)")
     evidence_note: Optional[str] = Field(
@@ -104,7 +104,7 @@ class SimulationResponse(BaseModel):
         description="Catatan netral bila pola cedera spesifik tidak tersedia di data kurasi (fallback difus redup); null bila ada monograf spesifik",
     )
 
-    # --- F7 (gerbang K4, PROJECT_FUSION.md): perluasan kontrak backward-compatible ---
+    # --- F7 (gerbang K4): perluasan kontrak backward-compatible ---
     fusion_reason: str = Field(..., description="Sel matriks fusi yang terpakai, mis. 'AI_MID x LOW_EXPOSURE' (F3)")
     thresholds_used: FusionThresholds = Field(..., description="Ambang T_low/T_high yang dipakai band AI pada simulasi ini (F2), utk transparansi/audit")
     timing_ms: Optional[Dict[str, float]] = Field(

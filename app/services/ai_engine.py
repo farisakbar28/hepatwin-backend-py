@@ -1,6 +1,7 @@
 """C10 -- Layanan inferensi AI GATNN-DNN (menggantikan versi GCNConv lama).
 
-Perbaikan enam cacat PROJECT_FIX_MODEL.md SS5.2 dari versi `master` lama:
+Perbaikan enam cacat dari versi `master` lama (terdokumentasi di
+ml/reports/C12_dokumentasi_model.md):
 1. `GCNConv` -> `GATv2Conv` (`hepatwin_ml.models.gatnn_dnn.GatnnDnn`, C4/C6).
 2. `nn.Sigmoid()` dihapus dari `forward()` model -- sigmoid HANYA di sini
    (`predict_dili_risk`), setelah kalibrasi (C7).
@@ -16,9 +17,8 @@ Perbaikan enam cacat PROJECT_FIX_MODEL.md SS5.2 dari versi `master` lama:
    ulang secara lokal di sini seperti versi lama (mencegah drift).
 
 Featurization/model/explainability diimpor dari `ml/` (`hepatwin_ml`, terpasang
-`-e ./ml` di `requirements.txt` root), BUKAN diduplikasi -- EXECUTION_PLAN_FIX_MODEL.md
-C10 langkah 2: "Duplikasi kode fitur adalah sumber klasik ketidakcocokan
-training<->inferensi."
+`-e ./ml` di `requirements.txt` root), BUKAN diduplikasi -- prinsip C10:
+"Duplikasi kode fitur adalah sumber klasik ketidakcocokan training<->inferensi."
 
 Kebijakan statis (C9): model dimuat SEKALI di `__init__`, `model.eval()`
 dipanggil, seluruh forward pass di bawah `torch.no_grad()`. Tidak ada jalur
@@ -44,8 +44,8 @@ from hepatwin_ml.models.gatnn_dnn import GatnnDnn
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_VERSION = "gatnn-dnn-fixmodel-v1"
-# Fallback hyperparameter final (PROJECT_FIX_MODEL.md SS3) -- dipakai hanya
-# bila file metadata tidak ada/gagal dibaca; nilai sesungguhnya SELALU
+# Fallback hyperparameter final (ml/reports/C6_train_summary.md) -- dipakai
+# hanya bila file metadata tidak ada/gagal dibaca; nilai sesungguhnya SELALU
 # dibaca dari model_gatnn_dnn_metadata.json (C6) bila tersedia.
 _FALLBACK_HIDDEN = 64
 _FALLBACK_DROPOUT = 0.2
@@ -157,8 +157,8 @@ class HybridAIEngine:
             logger.warning("Gagal memuat kalibrator dari %s: %s -- lanjut tanpa kalibrasi.", calibrator_file, exc)
 
     def _require_ready(self) -> None:
-        """Cacat #4 (PROJECT_FIX_MODEL.md SS5.2): TIDAK ADA fallback skor 0.5
-        diam-diam. Model tidak termuat -> 503 eksplisit, selalu, tanpa kecuali."""
+        """Cacat #4 (C10): TIDAK ADA fallback skor 0.5 diam-diam. Model tidak
+        termuat -> 503 eksplisit, selalu, tanpa kecuali."""
         if not self.ready or self.model is None:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -176,13 +176,6 @@ class HybridAIEngine:
                 detail=f"SMILES tidak valid atau gagal diparse RDKit: {smiles!r}",
             )
         return std
-
-    def validate_smiles(self, smiles: str) -> bool:
-        """Validasi dasar -- dipakai pemanggil yang hanya perlu tahu SMILES
-        bisa distandardisasi, tanpa menjalankan model."""
-        if not smiles or not isinstance(smiles, str):
-            return False
-        return standardize(smiles) is not None
 
     def predict_dili_risk(self, smiles: str) -> float:
         """SMILES -> P(DILI) terkalibrasi (float, 0..1).

@@ -229,7 +229,7 @@ async def main() -> None:
     lines.append(
         "- Kedua fungsi memanggil `standardize()` + featurisasi graph/fingerprint secara TERPISAH "
         "(diverifikasi lewat pembacaan kode `ai_engine.py`). Signifikansi duplikasi diukur di atas -- "
-        "**usulan** (BUKAN diterapkan, di luar cakupan F6 sesuai EXECUTION_PLAN_FUSION.md langkah 3: "
+        "**usulan** (BUKAN diterapkan, di luar cakupan F6 langkah 3: "
         "\"usulkan, jangan langsung terapkan\"): jalur gabungan yang men-standardize+featurize SEKALI, "
         "lalu memakai hasilnya utk kedua forward pass, akan menghemat sekitar durasi `standardize()` "
         "di atas dikali dua dikurangi satu kali -- signifikan hanya bila proporsinya besar relatif thd total.\n"
@@ -245,7 +245,7 @@ async def main() -> None:
     lines.append("## 5. Warm end-to-end (HTTP via TestClient, stack ASGI penuh)\n")
     lines.append(
         "Cold start diukur TERPISAH lewat `scripts/benchmark_cold_start.py` (proses Python terisolasi, "
-        "tanpa import lain sebelumnya) -- lihat `reports/F6_cold_start_terisolasi.md`. Angka di bawah "
+        "tanpa import lain sebelumnya) -- lihat laporan cold-start terisolasi. Angka di bawah "
         "murni distribusi WARM/steady-state (proses ini sudah menjalankan banyak inferensi sebelumnya).\n"
     )
     warm = http_bench["warm_ms"]

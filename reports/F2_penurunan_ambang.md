@@ -6,8 +6,10 @@ Berbasis `reports/F1_scores_catalogue.csv` (n=1231).
 > senyawa aman (Calcitonin salmon, AI_LOW di ketiga metode) TIDAK mencapai HIJAU pada skenario dosis
 > wajar manapun -- bukan karena pemilihan T_low/T_high AI, tapi karena `exposure_category` dari
 > `exposure_evaluator.py` SELALU HIGH_EXPOSURE untuk kovariat pasien realistis (0 dari 20.250 kombinasi
-> yang disweep mencapai LOW_EXPOSURE). Detail lengkap, akar sebab, dan implikasinya ada di
-> **`reports/F2_exposure_reachability_finding.md`**. Ini BUKAN sesuatu yang bisa diperbaiki di F2/F3
+> yang disweep mencapai LOW_EXPOSURE). Detail lengkap, akar sebab, dan implikasinya dirangkum di
+> **`reports/F9_limitations_fusion.md` §3** (temuan ini kemudian terselesaikan oleh evaluator v2.3
+> berbasis kuantil P33/P66 yang termerge dari `master` -- lihat ADENDUM di bagian itu). Ini BUKAN
+> sesuatu yang bisa diperbaiki di F2/F3
 > (lapisan fusi) -- akar masalahnya di `exposure_evaluator.py`, di luar wewenang agen tanpa keputusan
 > Farmasi (gerbang K3). Dampaknya: DoD "Hijau terbukti bisa muncul" TIDAK akan tercapai lewat skenario
 > pasien end-to-end sampai K3 diputuskan, walau band AI (dili_score) itu sendiri sudah diperbaiki.
@@ -20,7 +22,7 @@ Berbasis `reports/F1_scores_catalogue.csv` (n=1231).
 | (b) Pemetaan-balik | 0.5458 | 0.6866 |
 | (c) Biaya klinis | 0.5621 | 0.6898 |
 
-**Catatan metode (c):** dokumen (`PROJECT_FUSION.md` SS4.2) hanya menspesifikasikan kriteria T_low (persentil-5 gabungan vMost+vLess, false negative rate <=5%). T_high metode (c) di atas adalah **interpretasi AI** -- persentil-95 distribusi vNo, kriteria simetris (false positive rate <=5% utk label MERAH pada senyawa vNo). `[KEPUTUSAN AI -- PENDING REVIEW FARMASI]`
+**Catatan metode (c):** dokumen F2 hanya menspesifikasikan kriteria T_low (persentil-5 gabungan vMost+vLess, false negative rate <=5%). T_high metode (c) di atas adalah **interpretasi AI** -- persentil-95 distribusi vNo, kriteria simetris (false positive rate <=5% utk label MERAH pada senyawa vNo). `[KEPUTUSAN AI -- PENDING REVIEW FARMASI]`
 
 ## Kandidat (a) Tersier (T_low=0.6046, T_high=0.6664)
 

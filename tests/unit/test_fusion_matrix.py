@@ -13,7 +13,7 @@ from app.services.fusion_service import AiRiskBand, FusionService
 T_LOW = 0.5458
 T_HIGH = 0.6866
 
-# Sembilan sel matriks (PRD Bab 8.3 / PROJECT_FUSION.md SS4.1) -- setiap sel
+# Sembilan sel matriks (PRD Bab 8.3) -- setiap sel
 # hasil (risk_level, visual_color, blinking_speed) diverifikasi eksplisit,
 # tidak ada yang boleh tak-teruji.
 MATRIX_CASES = [

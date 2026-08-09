@@ -1,14 +1,14 @@
 """F1 -- Diagnostik distribusi `dili_score` atas seluruh katalog senyawa
 `is_simulatable = TRUE`. Fondasi data untuk penurunan ambang T_low/T_high (F2).
 
-Latar belakang (PROJECT_FUSION.md SS3.1): kalibrator produksi
+Latar belakang (temuan SS3.1, lihat reports/F9_limitations_fusion.md §1): kalibrator produksi
 (`calibrator_gatnn_dnn.pkl`, Platt scaling pada probabilitas) mengunci rentang
 keluaran `dili_score` ke [~0.4337, ~0.7747] -- jauh di atas ambang hijau lama
 (< 0.30). Skrip ini MENGUKUR rentang nyata via eksekusi, bukan mengandalkan
 angka yang dikutip di dokumen.
 
 Catatan privilese DB (relevan untuk instruksi "gunakan SUPABASE_ANON_KEY,
-bukan service role key" di EXECUTION_PLAN_FUSION.md F1 langkah 1): repo ini
+bukan service role key" di F1 langkah 1): repo ini
 TIDAK memiliki jalur akses DB yang dibedakan oleh anon-key vs service-role key
 -- `CompoundRepository` (dipakai ulang di sini) selalu terhubung lewat
 `DATABASE_URL`, yaitu koneksi Postgres pooler Supabase langsung dengan role
@@ -169,14 +169,14 @@ def main() -> None:
     lines.append(f"| max | {stats['max']:.4f} |")
     lines.append("")
 
-    lines.append("## Verifikasi temuan SS3.1 (PROJECT_FUSION.md)\n")
+    lines.append("## Verifikasi temuan SS3.1\n")
     lines.append(f"- Batas bawah aktual terukur: **{stats['min']:.4f}** (ekspektasi dokumen: ~0.4337)")
     lines.append(f"- Batas atas aktual terukur: **{stats['max']:.4f}** (ekspektasi dokumen: ~0.7747)")
     lines.append(f"- Jumlah senyawa dengan dili_score < 0.30: **{n_below_030}** (ekspektasi: 0)")
     if n_below_030 > 0:
         lines.append(
             "  - \U0001F6A9 **TEMUAN BERUBAH** -- ada senyawa di bawah 0.30. "
-            "Asumsi dasar SS3.1 PROJECT_FUSION.md perlu ditinjau ulang sebelum F2 dilanjutkan."
+            "Asumsi dasar SS3.1 perlu ditinjau ulang sebelum F2 dilanjutkan."
         )
     lines.append("")
 

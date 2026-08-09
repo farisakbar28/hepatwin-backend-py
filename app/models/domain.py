@@ -7,13 +7,9 @@ dan `api/endpoints/compounds.py` -- tanpa file ini backend tidak bisa di-import
 sama sekali. Skema 42 kolom di bawah diverifikasi lewat query langsung ke
 Supabase (anon key, `SELECT *` satu baris), bukan ditebak dari kode pemanggil.
 
-Catatan: `CompoundDetail` (app/models/schemas.py) dan
-`api/endpoints/compounds.py` mengakses beberapa atribut deskriptor PubChem
-(`iupac_name`, `heavy_atom_count`, `hydrogen_bond_donor_count`, dst.) yang
-TIDAK ada di skema tabel nyata -- itu bug pra-eksisting di luar cakupan Alur
-Kerja C, dicatat di `ml/reports/backlog.md`, TIDAK ditambahkan di sini sebagai
-kolom karangan (menambah kolom yang tidak ada di tabel akan membuat setiap
-SELECT gagal dengan "column does not exist").
+Kolom yang diekspos via `CompoundDetail` (app/models/schemas.py) dan
+`api/endpoints/compounds.py` seluruhnya ada di skema tabel nyata (lihat
+ml/reports/backlog.md untuk riwayat perbaikan field PubChem lama yang dihapus).
 """
 from datetime import datetime
 from typing import Optional

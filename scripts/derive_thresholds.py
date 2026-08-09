@@ -1,4 +1,4 @@
-"""F2 -- Penurunan ambang T_low/T_high dari data (gerbang K2, PROJECT_FUSION.md SS4.2).
+"""F2 -- Penurunan ambang T_low/T_high dari data (gerbang K2).
 
 Menghitung TIGA kandidat ambang warna atas distribusi nyata `dili_score`
 (reports/F1_scores_catalogue.csv, 1.231 senyawa is_simulatable=TRUE):
@@ -177,7 +177,7 @@ def main() -> None:
         lines.append(f"| {name} | {tl:.4f} | {th:.4f} |")
     lines.append("")
     lines.append(
-        "**Catatan metode (c):** dokumen (`PROJECT_FUSION.md` SS4.2) hanya menspesifikasikan kriteria "
+        "**Catatan metode (c):** dokumen F2 hanya menspesifikasikan kriteria "
         "T_low (persentil-5 gabungan vMost+vLess, false negative rate <=5%). T_high metode (c) di atas "
         "adalah **interpretasi AI** -- persentil-95 distribusi vNo, kriteria simetris (false positive rate "
         "<=5% utk label MERAH pada senyawa vNo). `[KEPUTUSAN AI -- PENDING REVIEW FARMASI]`\n"

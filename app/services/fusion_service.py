@@ -9,7 +9,7 @@ class AiRiskBand(str, Enum):
     """Band dili_score terkalibrasi, ambang dari `settings.FUSION_AI_T_LOW`/
     `FUSION_AI_T_HIGH` (F2, gerbang K2) -- BUKAN 0.30/0.70 tetap seperti versi
     lama, karena rentang keluaran kalibrator terkunci di [~0.4337, ~0.7747]
-    (PROJECT_FUSION.md SS3.1)."""
+    (lihat reports/F9_limitations_fusion.md §1)."""
 
     AI_LOW = "AI_LOW"
     AI_MID = "AI_MID"
@@ -23,10 +23,10 @@ class FusionResult(NamedTuple):
     fusion_reason: str
 
 
-# Matriks 3x3 eksplisit (PROJECT_FUSION.md SS4.1, PRD Bab 8.3) -- menggantikan
-# rantai `if/elif ... or ...` lama yang membuat cabang hijau & MODERATE_EXPOSURE
-# jadi kode mati (SS3.1, SS3.2). Seluruh 9 sel terlihat, tidak ada yang bisa
-# tersembunyi tak-terjangkau secara struktural.
+# Matriks 3x3 eksplisit (PRD Bab 8.3) -- menggantikan rantai
+# `if/elif ... or ...` lama yang membuat cabang hijau & MODERATE_EXPOSURE
+# jadi kode mati. Seluruh 9 sel terlihat, tidak ada yang bisa tersembunyi
+# tak-terjangkau secara struktural.
 _MATRIX: Dict[Tuple[AiRiskBand, str], Tuple[str, str, str]] = {
     (AiRiskBand.AI_LOW, ExposureRiskLevel.LOW.value): ("low", "green", "none"),
     (AiRiskBand.AI_LOW, ExposureRiskLevel.MODERATE.value): ("medium", "yellow", "slow"),
@@ -47,7 +47,7 @@ class FusionService:
     Probabilitas AI (GATNN-DNN, band AI_LOW/AI_MID/AI_HIGH) dan Metrik Paparan
     Relatif PBPK (LOW/MODERATE/HIGH_EXPOSURE), murni rule-based (TIDAK ADA
     machine learning atau pembobotan yang dipelajari -- syarat eksplisit D9).
-    Referensi: PRD v2.0 Bab 6.3 dan Bab 8.3; PROJECT_FUSION.md SS4.1 (F3).
+    Referensi: PRD Bab 6.3 dan Bab 8.3; matriks fusi 3x3 eksplisit (F3).
     """
 
     @staticmethod
