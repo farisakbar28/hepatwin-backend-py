@@ -125,6 +125,7 @@ uvicorn app.main:app --reload
 
 ## Deployment (Railway)
 
+- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_RAILWAY.md`**.
 - **Entrypoint:** `Procfile` → `web: uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 - **Build:** `pip install -r requirements.txt` (termasuk `-e ./ml`); seluruh
   artefak model di `app/models/` ikut ter-deploy (sudah tracked).
