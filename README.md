@@ -136,8 +136,10 @@ uvicorn app.main:app --reload
   `numba` TIDAK dipin di runtime (hemat ~21 MB; PBPK pakai fallback
   pure-Python, +23 ms tak relevan vs PRD 5 dtk),  (2) atom-masking SHAP
   di-chunk 32 varian/forward + varian dibangun per-chunk (lazy) (batasi
-  puncak memori molekul besar; batas stabil terukur ~120 atom, 1,9%
-  katalog >=120 atom berisiko gagal di Hobby), (3) `_trim_memory()` (glibc `malloc_trim`, Linux-only) setelah komputasi
+  puncak memori molekul besar; terverifikasi live: molekul s/d ~125 atom
+  stabil beruntun, >=128 atom stabil saat dipanggil tunggal, TAPI 21
+  senyawa (1,71%) >=126 atom berisiko 502 bila dipanggil beberapa besar
+  beruntun -- akumulasi memori arena, bukan hard limit), (3) `_trim_memory()` (glibc `malloc_trim`, Linux-only) setelah komputasi
   berat — cegah akumulasi RSS lintas request (+128 MB setelah 5 senyawa
   berbeda; tanpa `gc.collect` yang terukur ~260 ms/request), (4) explain LRU
   10.000 → 2.048

@@ -67,3 +67,43 @@ Cold start diukur TERPISAH lewat `scripts/benchmark_cold_start.py` (proses Pytho
 🚩 **Catatan P3 (cache respons /simulate):** p95 HTTP di atas diukur dengan profil request yang SAMA dengan PROFILES[0] benchmark internal, sehingga mayoritas dilayani dari cache in-memory (hit ~3 ms) -- ini efektivitas cache, BUKAN latensi komputasi hangat. Distribusi latensi komputasi murni (tanpa cache respons) ada di SS1: p95 total = 172 ms.
 
 🚩 **Namun** perhatikan SS1 di atas: benchmark INTERNAL (bypass HTTP, 150 panggilan lintas 50 senyawa berbeda) menemukan ekor `shap_ms` yang jauh lebih lebar dari yang tertangkap 30 sampel HTTP di sini -- lihat tabel "panggilan terlambat" di SS1 bila ada. p95 HTTP di atas TIDAK BOLEH dibaca sebagai jaminan seluruh 1.231 senyawa aman di bawah 5 detik; itu hanya berlaku utuh utk sampel 30 senyawa yang diuji di sini.
+
+---
+
+## 6. Verifikasi LIVE (FastAPI Cloud Hobby) pasca semua fix -- P0-P3 + OOM + gc + per-chunk
+
+Diukur langsung ke `https://hepatwin-backend-py.fastapicloud.dev` (0.1 vCPU shared, RAM 512 MB, commit `c4d0290`). Angka server-side memakai header `X-Process-Time` (durasi di dalam proses app); "total" termasuk RTT platform (~360 ms).
+
+### 6.1 Latensi server-side per skenario (5 senyawa: HT0012/HT0611/HT1072/HT0977/HT0444)
+
+| Skenario | p50 | p95 | max | n |
+|---|---|---|---|---|
+| **Compute murni** (dosis baru, cache kosong) | **323 ms** | **384 ms** | 387 ms | 5 |
+| **Warm-explain** (explain + PBPK-base tercache, hanya inferensi) | **11 ms** | **16 ms** | 17 ms | 10 |
+| **Cache-hit penuh** (respons identik, P3) | **1.1 ms** | **1.2 ms** | 1.3 ms | 10 |
+| Compute end-to-end (termasuk RTT platform) | 727 ms | 749 ms | 753 ms | 5 |
+
+### 6.2 DoD D7 di LIVE
+
+Semua request berhasil (nol 502) dengan `X-Process-Time` maksimum **1.342 ms** (HT0311, 128 atom, standalone) -- **jauh di bawah target 5 detik**. `dili_score` bit-identical dengan lokal (0.6501/0.6031/0.6661/0.6867/0.6432).
+
+### 6.3 Stabilitas 30 senyawa berbeda (berurutan, dosis 1200)
+
+| Kelompok molekul | Hasil |
+|---|---|
+| <=125 atom (98%+ katalog) | **stabil beruntun** -- semua 200, xpt 7-1045 ms |
+| 121-124 atom | 502/524 SEBELUM fix per-chunk -> **lulus beruntun SETELAH** fix (xpt 504-1204 ms) |
+| 128 atom | lulus saat dipanggil TUNGGAL (xpt 1342 ms) + cache-hit 1.3 ms |
+| >=126 atom beruntun | berisiko 502: **akumulasi memori arena** (bukan hard limit; 21 senyawa = 1,71% katalog) |
+| >=200 atom (17 senyawa, 1,38%) | outlier terdokumentasi (kelas Aprotinin 454 atom) |
+
+> Akar 502: puncak memori compute ~460-565 MB app-only (tergantung ukuran molekul) pada limit 512 MB Hobby. Dimitigasi bertahap: (1) SHAP matched-only + batched (P0), (2) chunk atom-masking 32 varian/forward (OOM fix), (3) varian dibangun per-chunk lazy + `_trim_memory()` glibc `malloc_trim` (fix gc), (4) `numba` dikeluarkan dari runtime (-21 MB baseline). Nol 502 di seluruh sesi verifikasi penggunaan normal (satu senyawa per request).
+
+### 6.4 Ringkasan angka final vs F6 lokal
+
+| Metrik | Lokal (idle) | Live Hobby (0.1 vCPU) |
+|---|---|---|
+| Compute p95 | 172 ms (SS1) | **384 ms** |
+| Warm-explain | -- | 16 ms |
+| Cache-hit | ~3 ms | **~1 ms** |
+| PRD <=5 dtk | LULUS | **LULUS (margin 3.7x)** |
