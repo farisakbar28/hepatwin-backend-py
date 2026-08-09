@@ -16,6 +16,29 @@ verifikasi aktual, bukan asumsi).
 
 ---
 
+## Render Free Tier — Batasan & Perilaku yang Wajib Diketahui
+
+Seluruh langkah di dokumen ini mengasumsikan **Render Free Tier**:
+
+| Aspek | Batasan / Perilaku Free Tier |
+|---|---|
+| **RAM** | **512 MB** (shared) — alasan utama PyTorch CPU-only (§3) |
+| **CPU** | **0.1 vCPU** (shared) |
+| **Disk** | **Ephemeral** — semua file lokal terhapus saat restart/redeploy/spin-down. Aplikasi ini **stateless**: state satu-satunya di Supabase (in-memory cache saja), jadi aman |
+| **Instance** | Maksimal **1 instance** (tanpa scaling horizontal) |
+| **Idle spin-down** | Tidur otomatis setelah **15 menit** tanpa traffic; jam instance tidak terpakai saat tidur |
+| **Cold start** | ±**30–60 detik** (~1 menit) saat bangun dari tidur; Render menampilkan halaman loading ke browser — **normal, bukan bug** |
+| **Instance hours** | **750 jam/bulan** per workspace |
+| **Build minutes** | **500 menit/bulan** — wheel CPU-only menjaga build cepat & hemat kuota |
+| **Bandwidth** | **5 GB outbound/bulan** (inbound gratis) |
+| **Tidak tersedia di Free** | Preview Environments, background workers, cron jobs, persistent disk |
+
+> **Frontend (Vercel):** karena cold start ±30–60 dtk, pastikan UI menangani
+> keterlambatan request pertama setelah idle (loading state / retry), bukan
+> timeout pendek.
+
+---
+
 ## 0. Prasyarat (sekali saja, sebelum deploy)
 
 - [x] Repository sudah di-push ke GitHub (`master`).
@@ -115,7 +138,7 @@ python -c "import rdkit; print(rdkit.__version__)"
 1. Klik **Deploy** (atau auto-deploy per push ke `master`).
 2. Tunggu build selesai; service Free akan **spins down setelah 15 menit idle**
    dan cold start kembali ±30–60 detik pada request pertama — ini **normal**
-   untuk Free Tier (bukan bug).
+   untuk Free Tier (bukan bug; lihat seksi batasan di atas).
 3. **Verifikasi wheel torch CPU-only** (Render → Logs):
    ```bash
    python -c "import torch; print(torch.__version__)"   # harus berakhiran +cpu
@@ -157,6 +180,8 @@ curl -X POST https://<app>.onrender.com/api/v1/simulate \
 - [ ] Cold start pertama ±30–60 dtk → request warm selanjutnya normal.
 - [ ] Tidak ada secret di Logs (Render Logs tidak mencetak env vars).
 - [ ] Deployment otomatis dari `master` aktif (Auto-Deploy).
+- [ ] Aplikasi stateless: tidak ada state yang ditulis ke disk lokal
+      (disk Free Tier ephemeral) — state hanya di Supabase.
 
 ---
 

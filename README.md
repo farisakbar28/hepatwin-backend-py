@@ -117,7 +117,9 @@ uvicorn app.main:app --reload
   `INTERNAL_DISTRIBUTIONAL_CALIBRATION` — bukan ambang klinis universal.
 - **Latensi:** cold boot proses ~5–7 detik (import torch/RDKit + load model;
   biaya boot, bukan per-request). Request warm end-to-end ~1.9–2.3 detik
-  (target PRD ≤5 dtk). Tail latency SHAP pernah teramati ~9.5 dtk pada satu
+  (target PRD ≤5 dtk). Di produksi (Render **Free Tier**), request pertama
+  setelah idle spin-down (15 menit) menambah cold start platform ±30–60 dtk
+  — bukan per-request. Tail latency SHAP pernah teramati ~9.5 dtk pada satu
   run (belum tuntas; lihat `reports/F9_limitations_fusion.md` §10).
 - **Mapping Couinaud** adalah heuristik pedagogis makrovaskular
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
@@ -139,6 +141,11 @@ uvicorn app.main:app --reload
   `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS`
   (origin frontend Vercel), `DEBUG=False`.
 - **Health check:** `GET /health` — set sebagai health check path di Render.
+- **Free Tier (perilaku yang wajib diketahui):** 512 MB RAM · 0.1 vCPU ·
+  1 instance · disk **ephemeral** (aplikasi stateless — state hanya di
+  Supabase) · **spin-down setelah 15 menit idle** dengan cold start
+  ±30–60 dtk pada request pertama. Rincian & kuota bulanan (750 jam
+  instance, 500 menit build) di `DEPLOYMENT_RENDER.md`.
 - Tidak bergantung pada path lokal/Windows; seluruh path relatif ke repo.
 
 ## Verifikasi
