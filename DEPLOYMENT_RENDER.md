@@ -18,14 +18,14 @@ verifikasi aktual, bukan asumsi).
 
 ## 0. Prasyarat (sekali saja, sebelum deploy)
 
-- [ ] Repository sudah di-push ke GitHub (`master`).
-- [ ] Project Supabase sudah berisi tabel `hepatwin_compounds` (1.336 baris,
+- [x] Repository sudah di-push ke GitHub (`master`).
+- [x] Project Supabase sudah berisi tabel `hepatwin_compounds` (1.336 baris,
       1.231 `is_simulatable = TRUE`).
       ```sql
       SELECT count(*) FROM public.hepatwin_compounds;  -- harap 1336
       SELECT count(*) FROM public.hepatwin_compounds WHERE is_simulatable = TRUE;  -- harap 1231
       ```
-- [ ] Migration RLS sudah diterapkan
+- [x] Migration RLS sudah diterapkan
       (`supabase/migrations/20260805_01_rls_hepatwin_compounds.sql`): akses
       service-role saja (`service_role`), tanpa RLS untuk anon — lookup via
       service-role key di backend.
@@ -89,8 +89,10 @@ Set variabel berikut di Dashboard Render:
 ## 3. Build & Dependency (PyTorch CPU-only)
 
 - `requirements.txt` memakai `--extra-index-url https://download.pytorch.org/whl/cpu`
-  dan `torch>=2.3.1+cpu` — pip memilih wheel CPU-only (jauh lebih kecil dari
-  wheel CUDA PyPI), sehingga build cepat dan memori saat instal < 512 MB.
+  dengan specifier polos `torch>=2.3.1` — pip memilih wheel CPU-only karena
+  versi `+cpu` dari index CPU sortir lebih tinggi dari versi plain PyPI
+  (specifier `+cpu` tidak valid untuk `>=` di PEP 508). Build cepat dan
+  memori saat instal < 512 MB.
 - Wheel RDKit manylinux membutuhkan OpenMP (`libgomp.so.1`); image build
   native Render umumnya sudah menyediakannya. Bila import RDKit gagal dengan
   `libgomp.so.1: cannot open shared object file`, gunakan deployment Docker

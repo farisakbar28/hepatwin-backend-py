@@ -132,8 +132,9 @@ uvicorn app.main:app --reload
 - **Entrypoint:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
   (Render meng-set `PORT` otomatis; default **10000**).
 - **Build:** native Python; PyTorch **CPU-only** via
-  `--extra-index-url https://download.pytorch.org/whl/cpu` + `torch>=2.3.1+cpu`
-  di `requirements.txt` — optimal untuk Free Tier **512 MB RAM**.
+  `--extra-index-url https://download.pytorch.org/whl/cpu` di `requirements.txt`
+  — wheel `+cpu` menang atas versi plain PyPI — optimal untuk Free Tier
+  **512 MB RAM** (verifikasi: `torch.__version__` berakhiran `+cpu`).
 - **Set env di Dashboard Render:** `DATABASE_URL`, `SUPABASE_URL`,
   `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS`
   (origin frontend Vercel), `DEBUG=False`.
