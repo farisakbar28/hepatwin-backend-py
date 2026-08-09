@@ -342,7 +342,7 @@ Keunggulan arsitektur HepaTwin terletak pada **pemisahan komputasi paralel-asink
 - **Cloud Database & Infrastructure:**
   - *Database:* **Supabase (PostgreSQL Managed)** untuk penyimpanan tabel `hepatwin_compounds` (1.336 baris dataset DILIrank 2.0 yang diperkaya dengan 40 kolom deskriptor PubChem dan monograf LiverTox).
   - *Security & Optimization:* Pengamanan jalur kueri via **Row Level Security (RLS)** dan mekanisme caching client-side untuk memenuhi target latensi NFR-02.
-  - *Deployment:* **Vercel** (Frontend) & **Render Free Tier** (Backend Web Service) dengan sertifikasi SSL/HTTPS penuh.
+  - *Deployment:* **Vercel** (Frontend) & **FastAPI Cloud Hobby Tier** (Backend) dengan sertifikasi SSL/HTTPS penuh.
 
 ### 7.3 Pemisahan Artefak Statis Backend (Dataset Kurasi vs Bobot Model)
 
@@ -977,11 +977,11 @@ Pengembangan perangkat lunak HepaTwin dilaksanakan dalam kerangka Agile Scrum se
 | **Sprint 0** | 1 Minggu | Fondasi Infrastruktur & Pipeline Visualisasi 3D Awal | Boilerplate GitHub (React / FastAPI), ekspor mesh 3D hati (`.glb`) 8 Segmen Couinaud ke WebGL, desain arsitektur tiga panel dashboard | **Selesai (100%)** |
 | **Sprint 1** | 2 Minggu | Mesin AI Prediksi DILI (GATNN-DNN) + SHAP | Kurasi DILIrank 2.0 [14] untuk training (dedup InChIKey stereo-aware: 0 dihapus; korpus training 1.231 senyawa `is_simulatable = TRUE`, 105 biologik di Supabase tanpa masuk AI) + enrichment LiverTox [18] di Supabase, ekstraksi fitur ECFP4 (RDKit), checkpoint PyTorch GATNN-DNN, integrasi SHAP | **Berjalan (70%)** |
 | **Sprint 2** | 1 Minggu | Pemodelan PBPK 4-Kompartemen & Penskalaan Alometrik | Solver ODE PBPK 4-kompartemen (SciPy) untuk $C_{\text{hati}}(t)$, modul konversi alometrik kovariat → $V_L$, $Q_L$, $Cl_{\text{metabolisme}}$, **plus Kp_R dinamis + fallback XLogP + clamp** — **UPDATED v2.3**, validasi internal oleh spesialis Farmasi | **Berjalan (60% → 80% post-audit)** |
-| **Sprint 3** *(Wajib selesai - Syarat Submit Penyisihan)* | 1 Minggu | Resolusi Nomenklatur, Pemetaan Segmen Couinaud, Hotspot 3D, Staging Deploy | Kurasi offline deskriptor PubChem PUG REST [15] (1.231/1.231 CID unik ter-resolve), autocomplete lookup lokal berfilter `is_simulatable = TRUE`, visualisasi 1.231 senyawa simulatable melalui segmen Couinaud atau hotspot difus sesuai ketersediaan pola cedera, implementasi blinking hotspot WebGL, serta deployment staging (Vercel/Render Free Tier) dengan fungsionalitas minimal 50% | **Berjalan (50–70%)** |
+| **Sprint 3** *(Wajib selesai - Syarat Submit Penyisihan)* | 1 Minggu | Resolusi Nomenklatur, Pemetaan Segmen Couinaud, Hotspot 3D, Staging Deploy | Kurasi offline deskriptor PubChem PUG REST [15] (1.231/1.231 CID unik ter-resolve), autocomplete lookup lokal berfilter `is_simulatable = TRUE`, visualisasi 1.231 senyawa simulatable melalui segmen Couinaud atau hotspot difus sesuai ketersediaan pola cedera, implementasi blinking hotspot WebGL, serta deployment staging (Vercel/FastAPI Cloud Hobby tier) dengan fungsionalitas minimal 50% | **Berjalan (50–70%)** |
 | **Sprint 4** | 2 Minggu | Fusi Penuh AI + PBPK, Integrasi 100% Dashboard | Lapisan fusi rule-based dengan **ambang T_LOW/HIGH distribusional pending K2 + exposure_index kuantil v2.3 pending K3**, integrasi penuh FastAPI–React (100% fungsionalitas teknis) | **Rencana (0% → pending K2/K3)** |
 | **Sprint 5** | 1 Minggu | Uji Fungsionalitas, Usability Klinis (UAT & SUS), Validasi Pakar | Pelaksanaan UAT dan pengujian *System Usability Scale* (SUS) pada 30 mahasiswa/pelajar farmasi, validasi model ilmiah oleh pakar farmakologi **termasuk validasi K2/K3 & K6** | **Rencana (0%)** |
 | **Sprint 6** | 2 Minggu | Refactoring Umpan Balik, Optimasi 3D, Dokumentasi | Perbaikan bug hasil UAT/SUS/pakar, optimasi frame rate WebGL ≥ 30 FPS, penyusunan dokumentasi teknis & panduan pengguna **+ ERRATA_PRD_PBPK.md** | **Rencana (0%)** |
-| **Sprint 7** *(Wajib selesai - Syarat Finalis November)* | 1 Minggu | Production Release, System Freeze, Audit Teknis | Deployment produksi (Vercel + Render Free Tier, SSL/HTTPS penuh), uji penetrasi keamanan sederhana & uji beban API, persiapan audit source code Babak Final **+ PBPK_Engine_Audit_Report_v2_3.md final** | **Rencana (0%)** |
+| **Sprint 7** *(Wajib selesai - Syarat Finalis November)* | 1 Minggu | Production Release, System Freeze, Audit Teknis | Deployment produksi (Vercel + FastAPI Cloud Hobby tier, SSL/HTTPS penuh), uji penetrasi keamanan sederhana & uji beban API, persiapan audit source code Babak Final **+ PBPK_Engine_Audit_Report_v2_3.md final** | **Rencana (0%)** |
 
 ---
 

@@ -10,7 +10,7 @@ rekomendasi dosis, atau keputusan terapi.
 - **API:** FastAPI + Pydantic v2 (Python 3.10+).
 - **AI:** PyTorch GATNN-DNN (inferensi statis, tanpa retraining runtime) +
   RDKit (graf molekul & ECFP4) — featurization/model/explain diimpor dari
-  paket `hepatwin-ml` (`ml/`, terpasang `-e ./ml`).
+  paket `hepatwin-ml` (`ml/`, terpasang `./ml` non-editable).
 - **Explainability:** atribusi tingkat gugus & atom (`hepatwin_ml.explain`,
   lihat `ml/reports/C8_shap.md`).
 - **PBPK:** SciPy `solve_ivp` (RK45) — 4 kompartemen linear, penskalaan
@@ -117,35 +117,37 @@ uvicorn app.main:app --reload
   `INTERNAL_DISTRIBUTIONAL_CALIBRATION` — bukan ambang klinis universal.
 - **Latensi:** cold boot proses ~5–7 detik (import torch/RDKit + load model;
   biaya boot, bukan per-request). Request warm end-to-end ~1.9–2.3 detik
-  (target PRD ≤5 dtk). Di produksi (Render **Free Tier**), request pertama
-  setelah idle spin-down (15 menit) menambah cold start platform ±30–60 dtk
-  — bukan per-request. Tail latency SHAP pernah teramati ~9.5 dtk pada satu
-  run (belum tuntas; lihat `reports/F9_limitations_fusion.md` §10).
+  (target PRD ≤5 dtk). Di produksi (FastAPI Cloud **Hobby tier**), request
+  pertama setelah idle (scale-to-zero default) menambah cold start platform
+  (boot ulang + muat model) — bukan per-request. Tail latency SHAP pernah
+  teramati ~9.5 dtk pada satu run (belum tuntas; lihat
+  `reports/F9_limitations_fusion.md` §10).
 - **Mapping Couinaud** adalah heuristik pedagogis makrovaskular
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
   histologis klinis.
 
-## Deployment (Render)
+## Deployment (FastAPI Cloud — Hobby / Free Tier)
 
-- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_RENDER.md`**.
-- **Blueprint IaC:** `render.yaml` (New → Blueprint) — runtime Python,
-  Build Command `pip install -r requirements.txt`, Start Command
-  `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health check `/health`.
-- **Entrypoint:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-  (Render meng-set `PORT` otomatis; default **10000**).
-- **Build:** native Python; PyTorch **CPU-only** via
-  `--extra-index-url https://download.pytorch.org/whl/cpu` di `requirements.txt`
-  — wheel `+cpu` menang atas versi plain PyPI — optimal untuk Free Tier
-  **512 MB RAM** (verifikasi: `torch.__version__` berakhiran `+cpu`).
-- **Set env di Dashboard Render:** `DATABASE_URL`, `SUPABASE_URL`,
-  `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS`
-  (origin frontend Vercel), `DEBUG=False`.
-- **Health check:** `GET /health` — set sebagai health check path di Render.
-- **Free Tier (perilaku yang wajib diketahui):** 512 MB RAM · 0.1 vCPU ·
-  1 instance · disk **ephemeral** (aplikasi stateless — state hanya di
-  Supabase) · **spin-down setelah 15 menit idle** dengan cold start
-  ±30–60 dtk pada request pertama. Rincian & kuota bulanan (750 jam
-  instance, 500 menit build) di `DEPLOYMENT_RENDER.md`.
+- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_FASTAPI_CLOUD.md`**.
+- **Platform:** [FastAPI Cloud](https://fastapicloud.com) **Hobby** ($0/bulan,
+  tanpa kartu kredit) — untuk penyisihan GEMASTIK: backend diakses publik
+  oleh frontend & juri. Bukan target high-traffic.
+- **Deploy:** CLI `fastapi deploy` dari root repo (atau GitHub Integration di
+  dashboard) — FastAPI Cloud **auto-detect** app (`app/main.py` →
+  `app.main:app`), meng-install `requirements.txt`, dan memberi URL publik
+  `https://<app-name>.fastapicloud.dev` (**HTTPS otomatis**).
+- **Verifikasi lokal sebelum deploy:** `fastapi dev` (tanpa argumen path).
+- **Build:** dependencies di-install di cloud dari `requirements.txt`;
+  PyTorch **CPU-only** via `--extra-index-url https://download.pytorch.org/whl/cpu`
+  — wheel `+cpu` menang atas versi plain PyPI (verifikasi: `torch.__version__`
+  berakhiran `+cpu`).
+- **Set env (CLI atau Dashboard → Environment Variables):** `DATABASE_URL`,
+  `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (rahasia
+  via `fastapi cloud env set --secret`), `BACKEND_CORS_ORIGINS` (origin
+  frontend Vercel), `DEBUG=False`.
+- **Scale-to-zero (default):** app tidur saat idle dan bangun saat ada
+  request — request pertama setelah idle menambah cold start (boot ulang +
+  muat model). Normal untuk Hobby tier; detail di `DEPLOYMENT_FASTAPI_CLOUD.md`.
 - Tidak bergantung pada path lokal/Windows; seluruh path relatif ke repo.
 
 ## Verifikasi

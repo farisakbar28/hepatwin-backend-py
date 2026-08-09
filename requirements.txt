@@ -4,19 +4,20 @@
 # PyTorch CPU-only: wheel CUDA bawaan PyPI membengkakkan image/instal
 # hingga beberapa GB dan tidak pernah dipakai (inferensi statis di CPU).
 # Dengan --extra-index-url pytorch/whl/cpu, pip memilih wheel "+cpu"
-# yang jauh lebih kecil — penting untuk Render Free Tier (512 MB RAM)
-# sekaligus aman untuk instalasi lokal (Windows/Linux).
+# yang jauh lebih kecil — penting untuk platform deployment dengan resource
+# terbatas (mis. FastAPI Cloud Hobby tier) sekaligus aman untuk instalasi
+# lokal (Windows/Linux).
 #
 # CATATAN: specifier tidak bisa ditulis "torch>=X.Y.Z+cpu" — PEP 508
 # hanya mengizinkan local version label dengan operator ==/!=. Jadi
 # dipakai specifier polos (torch>=2.3.1) + extra-index-url: versi
 # "X.Y.Z+cpu" dari index CPU sortir LEBIH TINGGI dari "X.Y.Z" plain
 # PyPI, sehingga wheel CPU yang menang. Verifikasi pasca-install:
-# torch.__version__ harus berakhiran +cpu (lihat DEPLOYMENT_RENDER.md).
+# torch.__version__ harus berakhiran +cpu (lihat DEPLOYMENT_FASTAPI_CLOUD.md).
 # ============================================================
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-fastapi>=0.111.0
+fastapi[standard]>=0.111.0
 uvicorn>=0.30.1
 pydantic>=2.7.4
 pydantic-settings>=2.3.4
@@ -40,4 +41,7 @@ cachetools>=5.3.3
 
 # Featurization/model/explain untuk app/services/ai_engine.py (C10) diimpor
 # dari sini, BUKAN diduplikasi -- mencegah drift training<->inferensi.
--e ./ml
+# Non-editable (bukan -e): editable install + layout src (packages.find
+# where=["src"]) gagal di build cloud FastAPI Cloud dengan error
+# "egg_base: src does not exist" -- wheel biasa terbukti stabil di pip/uv.
+./ml
