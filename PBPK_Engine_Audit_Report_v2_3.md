@@ -79,3 +79,11 @@ secara bermakna di seluruh tiga kategori LOW/MODERATE/HIGH yang dirancang PRD.
 Riwayat yang jujur (audit tetap LULUS untuk cakupannya sendiri + catatan
 keterbatasan cakupan) lebih bernilai untuk Jury Challenge daripada mengklaim
 audit itu mencakup lebih dari yang sebenarnya diperiksa.
+
+## 7. Status Deliverable Kredibilitas Terkait (PRD §11.1 item 7)
+
+- `PBPK_Engine_Audit_Report_v2_3.md` — dokumen ini; tersedia dan ter-track di repository.
+- `Credibility_Assessment_Report_v2_3.md` — **belum tersedia** di repository (PRD §11.1 item 7;
+  Sprint 7 berstatus "Rencana (0%)"). Ini deliverable tim/Farmasi yang membutuhkan evidence
+  K2/K3/K6, review Farmasi, dan UAT — bukan artefak yang dapat difabrikasi dari kode. Status ini
+  dicatat jujur di sini agar gap tidak tersembunyi.

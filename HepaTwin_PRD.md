@@ -981,7 +981,7 @@ Pengembangan perangkat lunak HepaTwin dilaksanakan dalam kerangka Agile Scrum se
 | **Sprint 4** | 2 Minggu | Fusi Penuh AI + PBPK, Integrasi 100% Dashboard | Lapisan fusi rule-based dengan **ambang T_LOW/HIGH distribusional pending K2 + exposure_index kuantil v2.3 pending K3**, integrasi penuh FastAPI–React (100% fungsionalitas teknis) | **Rencana (0% → pending K2/K3)** |
 | **Sprint 5** | 1 Minggu | Uji Fungsionalitas, Usability Klinis (UAT & SUS), Validasi Pakar | Pelaksanaan UAT dan pengujian *System Usability Scale* (SUS) pada 30 mahasiswa/pelajar farmasi, validasi model ilmiah oleh pakar farmakologi **termasuk validasi K2/K3 & K6** | **Rencana (0%)** |
 | **Sprint 6** | 2 Minggu | Refactoring Umpan Balik, Optimasi 3D, Dokumentasi | Perbaikan bug hasil UAT/SUS/pakar, optimasi frame rate WebGL ≥ 30 FPS, penyusunan dokumentasi teknis & panduan pengguna **+ ERRATA_PRD_PBPK.md** | **Rencana (0%)** |
-| **Sprint 7** *(Wajib selesai - Syarat Finalis November)* | 1 Minggu | Production Release, System Freeze, Audit Teknis | Deployment produksi (Vercel + Railway, SSL/HTTPS penuh), uji penetrasi keamanan sederhana & uji beban API, persiapan audit source code Babak Final **+ PBPK_Engine_Audit_Report.md final** | **Rencana (0%)** |
+| **Sprint 7** *(Wajib selesai - Syarat Finalis November)* | 1 Minggu | Production Release, System Freeze, Audit Teknis | Deployment produksi (Vercel + Railway, SSL/HTTPS penuh), uji penetrasi keamanan sederhana & uji beban API, persiapan audit source code Babak Final **+ PBPK_Engine_Audit_Report_v2_3.md final** | **Rencana (0%)** |
 
 ---
 

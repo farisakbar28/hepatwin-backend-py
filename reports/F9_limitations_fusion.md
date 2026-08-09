@@ -128,13 +128,14 @@ apa pun bisa dilayani) + request pertama SETELAH proses siap (~1.9-2.3 detik, DI
 boot tetap relevan operasional (waktu deploy/restart) tapi bukan bagian DoD D7 (diukur via
 `scripts/benchmark_cold_start.py`).
 
-## 12. `PBPK_Engine_Audit_Report.md` (pembaruan 2026-08-09)
+## 12. `PBPK_Engine_Audit_Report_v2_3.md` (pembaruan 2026-08-09)
 
 Saat penulisan laporan ini, `PBPK_Engine_Audit_Report.md` tidak ditemukan di git history -- diduga berada
 di luar repo (Google Docs tim, dsb). **Pembaruan:** dokumen tersebut kini ADA dan ter-track di root repo
-(`PBPK_Engine_Audit_Report.md`, berisi audit v2.3). Adendum "koreksi cakupan" (SS3.1/SS3.2 sebagai
-koreksi cakupan, bukan pembatalan hasil LULUS) telah **digabungkan ke dokumen tersebut** sebagai
-"§6. Adendum (2026-08-09)" per instruksi task.
+sebagai `PBPK_Engine_Audit_Report_v2_3.md` (nama diselaraskan dengan daftar deliverable PRD §11.1;
+berisi audit v2.3). Adendum "koreksi cakupan" (SS3.1/SS3.2 sebagai koreksi cakupan, bukan pembatalan
+hasil LULUS) telah **digabungkan ke dokumen tersebut** sebagai "§6. Adendum (2026-08-09)" per
+instruksi task.
 
 ## 13. Status gerbang K1-K6
 
