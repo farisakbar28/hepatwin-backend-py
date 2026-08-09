@@ -1,0 +1,55 @@
+# ============================================================
+# .dockerignore — mencegah secret & artefak dev masuk ke image
+# (terutama penting untuk Dockerfile deployment Koyeb).
+# ============================================================
+
+# Environment & secrets (JANGAN pernah masuk image)
+.env
+.env.*
+*.pem
+*.key
+*.cert
+auth.json
+
+# VCS & editor
+.git
+.gitignore
+.idea
+.vscode
+opencode.json
+
+# Python
+venv
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+
+# Test & cache
+.pytest_cache
+.pytest_tmp
+tests
+
+# Data lokal / dump SQL (besar, bukan runtime)
+hepatwin_compounds_rows.sql
+*.sql
+
+# Riset ml: data & laporan tidak dibutuhkan saat runtime
+# (hanya paket ml/src yang terinstal via -e ./ml)
+ml/data
+ml/models
+ml/reports
+ml/scripts
+ml/tests
+
+# Dokumentasi deploy (tidak perlu di dalam image)
+DEPLOYMENT_KOYEB.md
+README.md
+HepaTwin_PRD.md
+PBPK_Engine_Audit_Report_v2_3.md
+reports
+
+# Log & OS
+*.log
+.DS_Store
+Thumbs.db

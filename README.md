@@ -123,16 +123,19 @@ uvicorn app.main:app --reload
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
   histologis klinis.
 
-## Deployment (Railway)
+## Deployment (Koyeb)
 
-- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_RAILWAY.md`**.
-- **Entrypoint:** `Procfile` → `web: uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
-- **Build:** `pip install -r requirements.txt` (termasuk `-e ./ml`); seluruh
-  artefak model di `app/models/` ikut ter-deploy (sudah tracked).
-- **Set env di dashboard Railway:** `DATABASE_URL`, `SUPABASE_URL`,
+- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_KOYEB.md`**.
+- **Entrypoint:** `Procfile` → `web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`
+  (Koyeb default HTTP port **8000**).
+- **Build:** `Dockerfile` disertakan (PyTorch **CPU-only** via
+  `--extra-index-url https://download.pytorch.org/whl/cpu` — optimal untuk
+  Micro Instance 512 MB); alternatif buildpack (Nixpacks) juga didukung.
+- **Set env di dashboard Koyeb:** `DATABASE_URL`, `SUPABASE_URL`,
   `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS`
   (origin frontend Vercel), `DEBUG=False`.
-- **Health check:** `GET /health` — gunakan untuk readiness probe.
+- **Health check:** `GET /health` — set sebagai HTTP health check di Koyeb
+  (path `/health`).
 - Tidak bergantung pada path lokal/Windows; seluruh path relatif ke repo.
 
 ## Verifikasi
