@@ -12,8 +12,7 @@ rekomendasi dosis, atau keputusan terapi.
   RDKit (graf molekul & ECFP4) — featurization/model/explain diimpor dari
   paket `hepatwin-ml` (`ml/src/hepatwin_ml`, murni .py). Lokal:
   `python -m pip install ./ml`; di cloud runtime di-bootstrap otomatis oleh
-  `app/main.py` dari `ml/src` (tanpa dependency/env var — lihat
-  `DEPLOYMENT_FASTAPI_CLOUD.md` §4).
+  `app/main.py` dari `ml/src` (tanpa dependency/env var).
 - **Explainability:** atribusi tingkat gugus & atom (`hepatwin_ml.explain`,
   lihat `ml/reports/C8_shap.md`).
 - **PBPK:** SciPy `solve_ivp` (RK45) — 4 kompartemen linear, penskalaan
@@ -133,28 +132,25 @@ uvicorn app.main:app --reload
 
 ## Deployment (FastAPI Cloud — Hobby / Free Tier)
 
-- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_FASTAPI_CLOUD.md`**.
 - **Platform:** [FastAPI Cloud](https://fastapicloud.com) **Hobby** ($0/bulan,
-  tanpa kartu kredit) — untuk penyisihan GEMASTIK: backend diakses publik
-  oleh frontend & juri. Bukan target high-traffic.
-- **Deploy:** CLI `fastapi deploy` dari root repo (atau GitHub Integration di
-  dashboard) — FastAPI Cloud **auto-detect** app (`app/main.py` →
-  `app.main:app`), meng-install `requirements.txt`, dan memberi URL publik
-  `https://<app-name>.fastapicloud.dev` (**HTTPS otomatis**).
-- **Verifikasi lokal sebelum deploy:** `fastapi dev` (tanpa argumen path).
-- **Build:** dependencies di-install di cloud dari `requirements.txt`;
-  PyTorch **CPU-only** via `--extra-index-url https://download.pytorch.org/whl/cpu`
-  — wheel `+cpu` menang atas versi plain PyPI (verifikasi: `torch.__version__`
-  berakhiran `+cpu`).
-- **Set env (CLI atau Dashboard → Environment Variables):** `DATABASE_URL`,
-  `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (rahasia
-  via `fastapi cloud env set --secret`), `BACKEND_CORS_ORIGINS` (origin
-  frontend Vercel), `DEBUG=False`. **`PYTHONPATH` TIDAK perlu di-set** —
-  `app/main.py` meng-bootstrap `hepatwin-ml` dari `ml/src` (platform bahkan
-  menolak env var ini dengan HTTP 422).
-- **Scale-to-zero (default):** app tidur saat idle dan bangun saat ada
-  request — request pertama setelah idle menambah cold start (boot ulang +
-  muat model). Normal untuk Hobby tier; detail di `DEPLOYMENT_FASTAPI_CLOUD.md`.
+  tanpa kartu kredit) — backend publik untuk penyisihan GEMASTIK
+  (`https://hepatwin-backend-py.fastapicloud.dev`, HTTPS otomatis). Bukan
+  target high-traffic.
+- **Sumber kode:** GitHub Integration — push `master` memicu build + deploy
+  otomatis (FastAPI Cloud auto-detect `app.main:app`, install dari
+  `requirements.txt`).
+- **Build:** PyTorch **CPU-only** via
+  `--extra-index-url https://download.pytorch.org/whl/cpu` — wheel `+cpu`
+  menang atas versi plain PyPI (verifikasi: `torch.__version__` berakhiran
+  `+cpu`).
+- **Env vars:** di-set di Dashboard FastAPI Cloud (App → Environment
+  Variables) — `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS` (origin frontend),
+  `DEBUG=False`. **`PYTHONPATH` TIDAK perlu di-set** — `app/main.py`
+  meng-bootstrap `hepatwin-ml` dari `ml/src` (platform menolak env var ini
+  dengan HTTP 422).
+- **Scale-to-zero (default):** app tidur saat idle; request pertama setelah
+  idle menambah cold start (boot ulang + muat model) — normal untuk Hobby tier.
 - Tidak bergantung pada path lokal/Windows; seluruh path relatif ke repo.
 
 ## Verifikasi

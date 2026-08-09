@@ -13,7 +13,7 @@
 # dipakai specifier polos (torch>=2.3.1) + extra-index-url: versi
 # "X.Y.Z+cpu" dari index CPU sortir LEBIH TINGGI dari "X.Y.Z" plain
 # PyPI, sehingga wheel CPU yang menang. Verifikasi pasca-install:
-# torch.__version__ harus berakhiran +cpu (lihat DEPLOYMENT_FASTAPI_CLOUD.md).
+# torch.__version__ harus berakhiran +cpu (verifikasi saat instalasi/deploy).
 # ============================================================
 --extra-index-url https://download.pytorch.org/whl/cpu
 
