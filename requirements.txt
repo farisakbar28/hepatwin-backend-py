@@ -40,12 +40,17 @@ cachetools>=5.3.3
 #  sejak numpy 2.0; numpy 1.x akan crash saat runtime).
 
 # Featurization/model/explain untuk app/services/ai_engine.py (C10) diimpor
-# dari sini, BUKAN diduplikasi -- mencegah drift training<->inferensi.
-# Di-install dari wheel PRE-BUILT, BUKAN membangun dari source di cloud:
-# build source (editable maupun wheel) gagal di FastAPI Cloud (error
-# "egg_base: src does not exist"; layout src packages.find where=["src"]),
-# dan direktori build-output seperti dist/ bisa di-exclude dari konteks
-# build cloud. Wheel ditaruh di wheels/ (repo root, nama non-dist) dan
-# ter-install tanpa langkah build. Rebuild wheel setelah mengubah ml/src:
-# python -m pip wheel ./ml -w wheels
-./wheels/hepatwin_ml-0.1.0-py3-none-any.whl
+# dari paket `hepatwin_ml` (ml/src), BUKAN diduplikasi -- mencegah drift
+# training<->inferensi.
+#
+# CATATAN: `hepatwin-ml` TIDAK lagi dependency requirements.txt. Build cloud
+# FastAPI Cloud TIDAK dapat menyediakan paket local-path:
+#   - build source (editable `-e ./ml` maupun wheel `./ml`) gagal dengan
+#     "egg_base: 'src' does not exist" (layout src; CWD build cloud tidak
+#     stabil);
+#   - wheel pre-built (di `ml/dist/` maupun `wheels/` repo root) gagal
+#     dengan "Distribution not found at: file:///app/..." (file `.whl`
+#     tidak pernah sampai ke konteks build cloud).
+# Runtime cloud mengimpor `hepatwin_ml` langsung dari `ml/src` (murni .py,
+# selalu ikut ter-upload) melalui env var PYTHONPATH=/app/ml/src. Lokal:
+# python -m pip install ./ml  (build source lokal stabil).

@@ -10,9 +10,9 @@ rekomendasi dosis, atau keputusan terapi.
 - **API:** FastAPI + Pydantic v2 (Python 3.10+).
 - **AI:** PyTorch GATNN-DNN (inferensi statis, tanpa retraining runtime) +
   RDKit (graf molekul & ECFP4) — featurization/model/explain diimpor dari
-  paket `hepatwin-ml` (`ml/`, terpasang dari wheel pre-built
-  `wheels/hepatwin_ml-0.1.0-py3-none-any.whl`; rebuild setelah ubah
-  `ml/src`: `python -m pip wheel ./ml -w wheels`).
+  paket `hepatwin-ml` (`ml/src/hepatwin_ml`, murni .py). Lokal:
+  `python -m pip install ./ml`; di cloud runtime tersedia via env var
+  `PYTHONPATH=/app/ml/src` (lihat `DEPLOYMENT_FASTAPI_CLOUD.md` §3/§4).
 - **Explainability:** atribusi tingkat gugus & atom (`hepatwin_ml.explain`,
   lihat `ml/reports/C8_shap.md`).
 - **PBPK:** SciPy `solve_ivp` (RK45) — 4 kompartemen linear, penskalaan
@@ -86,6 +86,7 @@ pakar/juri: `BMI`, `metabolic_risk_flag`, `V_P_L`, `V_L_L`, `V_K_L`, `V_R_L`,
 | `BACKEND_CORS_ORIGINS` | Origin yang diizinkan, JSON array atau koma (default `["http://localhost:3000"]`). |
 | `AI_MODEL_PATH` | Path artefak model (default `app/models/model_gatnn_dnn.pt`). |
 | `DEBUG` | `False` di produksi; `True` menambahkan `timing_ms` per-tahap pada response simulate. |
+| `PYTHONPATH` | **Khusus cloud:** `/app/ml/src` — menyediakan paket `hepatwin-ml` saat runtime. Tidak diperlukan lokal (`pip install ./ml`). |
 
 ## Model Artifacts
 
@@ -101,6 +102,7 @@ pakar/juri: `BMI`, `metabolic_risk_flag`, `V_P_L`, `V_L_L`, `V_K_L`, `V_R_L`,
 python -m venv venv
 # Windows: venv/Scripts/python.exe -m pip install -r requirements.txt
 python -m pip install -r requirements.txt
+python -m pip install ./ml   # paket hepatwin-ml (ml/src), lihat Stack
 cp .env.example .env   # isi SUPABASE_URL / DATABASE_URL / keys
 uvicorn app.main:app --reload
 ```
@@ -146,7 +148,8 @@ uvicorn app.main:app --reload
 - **Set env (CLI atau Dashboard → Environment Variables):** `DATABASE_URL`,
   `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (rahasia
   via `fastapi cloud env set --secret`), `BACKEND_CORS_ORIGINS` (origin
-  frontend Vercel), `DEBUG=False`.
+  frontend Vercel), `DEBUG=False`, dan **`PYTHONPATH=/app/ml/src`** (paket
+  `hepatwin-ml` saat runtime — lihat §3/§4 di `DEPLOYMENT_FASTAPI_CLOUD.md`).
 - **Scale-to-zero (default):** app tidur saat idle dan bangun saat ada
   request — request pertama setelah idle menambah cold start (boot ulang +
   muat model). Normal untuk Hobby tier; detail di `DEPLOYMENT_FASTAPI_CLOUD.md`.
