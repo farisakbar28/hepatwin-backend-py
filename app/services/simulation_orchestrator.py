@@ -1,5 +1,7 @@
+import gc
 import logging
 import asyncio
+import sys
 import time
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
@@ -18,6 +20,26 @@ from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeries
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _trim_memory() -> None:
+    """P3 (RAM diet Hobby 512 MB): kembalikan memori yang DITAHAN allocator
+    (numpy/torch/scipy) ke OS setelah komputasi berat -- tanpa ini RSS
+    terakumulasi lintas request (+128 MB setelah 5 senyawa berbeda) dan
+    mengetuk ambang OOM kill (502 + restart 60-100 dtk di live).
+
+    Linux-only: glibc malloc_trim(0) + gc.collect(); no-op aman di platform
+    lain. Kegagalan tidak boleh memengaruhi respons.
+    """
+    try:
+        gc.collect()
+        if sys.platform.startswith("linux"):
+            import ctypes
+
+            libc = ctypes.CDLL("libc.so.6")
+            libc.malloc_trim(0)
+    except Exception:
+        pass  # trim gagal -> biarkan, bukan kesalahan fatal
 
 
 def _timed(fn, *args):
@@ -132,6 +154,9 @@ class SimulationOrchestrator:
         (dili_score, t_ai), (shap_detail, t_shap), pbpk_result = await asyncio.gather(
             ai_task, shap_task, pbpk_task
         )
+        # P3: komputasi berat (AI+SHAP+PBPK) selesai -- lepas memori yang
+        # ditahan allocator segera (lihat docstring `_trim_memory`).
+        _trim_memory()
         t_pbpk = time.perf_counter() - t_pbpk_start
         t_parallel_wall = time.perf_counter() - t_parallel_start
         explainability_shap = [g["name"] for g in shap_detail["groups"]]

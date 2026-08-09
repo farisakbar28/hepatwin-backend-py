@@ -31,7 +31,6 @@ scipy>=1.13.1
 numpy>=2.0
 scikit-learn==1.7.2
 cachetools>=5.3.3
-numba==0.66.0
 
 # scikit-learn: WAJIB untuk unpickle `app/models/calibrator_gatnn_dnn.pkl`
 # (hepatwin_ml.calibrate.Calibrator membungkus sklearn LogisticRegression;
@@ -40,10 +39,13 @@ numba==0.66.0
 #  sklearn di environment, kalibrator gagal dimuat dan dili_score tidak
 #  terkalibrasi.
 #
-# numba: akselerasi JIT utk `app/services/pbpk_engine.py` (solve_ivp
-#  4-kompartemen) -- DIPIN ==0.66.0 = versi benchmark F6 & ml/requirements.lock.txt
-#  (deterministik, cloud identik dgn angka terukur). Tanpa numba engine jatuh ke
-#  fallback pure-Python (aman, lebih lambat ~5-15x).
+# numba: TIDAK masuk runtime produksi (P3, RAM diet Hobby 512 MB). JIT
+#  hanya hemat ~23 ms per solve_ivp 4-kompartemen (92 vs 115 ms) tetapi
+#  menambah ~21 MB baseline + spike kompilasi saat import -- pada app dengan
+#  baseline ~415 MB dan puncak compute ~493 MB, itu mengetuk ambang OOM kill
+#  (502 + restart di live). `app/services/pbpk_engine.py` tetap memakai JIT
+#  bila numba kebetulan terpasang (env ml), dengan fallback pure-Python aman
+#  di produksi.
 # numpy>=2.0: app/services/pbpk_engine.py memakai np.trapezoid (baru ada
 #  sejak numpy 2.0; numpy 1.x akan crash saat runtime).
 

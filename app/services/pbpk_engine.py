@@ -36,6 +36,8 @@ try:
     _pbpk_ode = njit(cache=True)(_pbpk_ode_python)
     _pbpk_ode(0.0, np.zeros(6), *([1.0] * 12))
 except Exception:  # pragma: no cover - optional acceleration must never block PBPK
+    # P3: numba TIDAK dipin di runtime produksi (RAM diet Hobby 512 MB --
+    # lihat requirements.txt); jalur default di cloud adalah fallback ini.
     _pbpk_ode = _pbpk_ode_python
 
 

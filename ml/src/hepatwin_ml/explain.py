@@ -23,10 +23,13 @@ yang untuk molekul besar computationally infeasible). Aturan kejujuran
 EXECUTION_PLAN_FIX_MODEL.md C8: menyebut hasil masking sebagai "SHAP" adalah
 klaim yang salah.
 
-Seluruh varian (molekul utuh + N atom di-mask) di-batch dalam SATU forward
-pass (`Batch.from_data_list`) -- anggaran latensi C8 (<2 detik p95, 50
-molekul), bukan loop serial per atom seperti versi `master` lama di
-`app/services/ai_engine.py` (diperbaiki C10).
+Seluruh varian (molekul utuh + N atom di-mask) diproses dalam forward
+ter-batch PER CHUNK (P3: `_ATOM_MASK_CHUNK` = 32 varian/forward, bukan satu
+batch raksasa) -- anggaran latensi C8 (<2 detik p95, 50 molekul) sekaligus
+membatasi puncak memori utk molekul besar (Rifampin 60 varian, Aprotinin
+455 varian): batch raksasa menaikkan RSS puluhan MB dan mengetuk ambang OOM
+Hobby tier 512 MB. Hasil matematis IDENTIK -- tiap varian tetap dihitung
+sendiri, hanya ukuran batch yang dibatasi.
 
 Cache IN-MEMORY bounded LRU per (model, inchikey) (P2) -- pengganti file JSON
 `shap_cache.json`/`explain_cache.json` yang dibaca/ditulis penuh tiap request
@@ -37,11 +40,10 @@ komputasi kini cepat (P0) dan deterministik.
 Footprint terukur (P2, deep sizeof): entri `smarts` ~1.4 KB KONSTAN (9
 kontribusi + method + elapsed); entri `explain` ~1.7 KB overhead + ~240
 B/atom (parasetamol 11 atom = 4.3 KB; 60 atom = 15.4 KB; 100 atom = 25.2 KB).
-Pada maxsize 10000 (dua cache): ~14 MB (smarts) + ~50-100 MB (explain,
-molekul drug-like) -- aman untuk Hobby tier FastAPI Cloud 512 MB (model
-GATNN-DNN hanya 3.5 MB di disk; registry 1231 senyawa). Worst-case SEMUA
-entri molekul >=100 atom ~252 MB, tidak realistis untuk beban aktual
-(trafik rendah per README).
+Pada maxsize 2048 (P3, DITURUNKAN dari 10000 pasca-temuan OOM Hobby 512 MB --
+baseline app ~415 MB + puncak compute ~493 MB mengetuk ambang): ~3 MB
+(smarts) + ~10-51 MB (explain, worst-case semua molekul >=100 atom) --
+margin aman utk 512 MB.
 
 Kunci cache memegang referensi kuat ke objek model (identitas objek). Dalam
 produksi hanya ada SATU shared model (singleton orchestrator) sehingga aman;
@@ -66,6 +68,9 @@ from hepatwin_ml.models.gatnn_dnn import GatnnDnn
 
 N_SMARTS = len(SMARTS_PATTERNS)
 _SHAPLEY_TIMEOUT_S = 3.0
+# P3: varian atom-masking diproses per chunk maksimal `_ATOM_MASK_CHUNK`
+# forward -- membatasi puncak memori utk molekul besar (lihat docstring C8).
+_ATOM_MASK_CHUNK = 32
 _COMPILED_SMARTS = [Chem.MolFromSmarts(p.pattern) for p in SMARTS_PATTERNS]
 
 
@@ -73,7 +78,7 @@ _COMPILED_SMARTS = [Chem.MolFromSmarts(p.pattern) for p in SMARTS_PATTERNS]
 # Cache in-memory bounded LRU (P2) -- pengganti file shap_cache/explain_cache
 # ---------------------------------------------------------------------------
 
-_EXPLAIN_CACHE_MAXSIZE = 10000
+_EXPLAIN_CACHE_MAXSIZE = 2048
 _explain_cache: LRUCache = LRUCache(maxsize=_EXPLAIN_CACHE_MAXSIZE)
 _explain_cache_lock = threading.Lock()
 _smarts_cache: LRUCache = LRUCache(maxsize=_EXPLAIN_CACHE_MAXSIZE)
@@ -314,11 +319,20 @@ def atom_masking_attribution(
         x_masked[i, :] = 0.0
         variants.append(Data(x=x_masked, edge_index=graph_data.edge_index, edge_attr=graph_data.edge_attr))
 
-    batch = Batch.from_data_list(variants)
-    batch.fingerprint = fp_tensor.unsqueeze(0).repeat(len(variants), 1)
-
-    with torch.no_grad():
-        probs = torch.sigmoid(model(batch)).numpy()
+    # P3: forward per CHUNK (bukan satu batch raksasa) -- membatasi puncak
+    # memori utk molekul besar (Rifampin 60 varian, Aprotinin 455 varian):
+    # batch 455 graf + fingerprint duplikat menaikkan RSS puluhan MB dan
+    # mengetuk ambang OOM Hobby 512 MB (502 + restart). Hasil matematis
+    # IDENTIK -- tiap varian tetap dihitung sendiri, hanya ukuran batch yang
+    # dibatasi.
+    n_variants = n_atoms + 1
+    probs = np.empty(n_variants, dtype=np.float64)
+    for start in range(0, n_variants, _ATOM_MASK_CHUNK):
+        chunk_variants = variants[start:start + _ATOM_MASK_CHUNK]
+        batch = Batch.from_data_list(chunk_variants)
+        batch.fingerprint = fp_tensor.unsqueeze(0).repeat(len(chunk_variants), 1)
+        with torch.no_grad():
+            probs[start:start + len(chunk_variants)] = torch.sigmoid(model(batch)).numpy().ravel()
 
     baseline_prob = float(probs[0])
     return [{"idx": i, "value": round(baseline_prob - float(probs[i + 1]), 6)} for i in range(n_atoms)]

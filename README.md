@@ -123,7 +123,7 @@ uvicorn app.main:app --reload
   `reports/F6_cold_start_terisolasi.md`):** komputasi per-simulasi **p95
   ~172 ms** (150 panggilan / 50 senyawa; request pertama setelah proses siap
   ~40 ms) — jauh di bawah target PRD ≤5 dtk. Cache in-memory (explain LRU
-  10.000 + respons `/simulate` LRU 512, per input deterministik) melayani
+  2.048 + respons `/simulate` LRU 512, per input deterministik) melayani
   request identik berulang dalam ~3 ms. SHAP di-batch + matched-only (P0):
   p50 ~10 ms (sebelumnya tail hingga ~9,5 dtk, lihat
   `reports/F9_limitations_fusion.md` §10). Ekor 11,9 dtk tersisa hanya untuk
@@ -131,6 +131,15 @@ uvicorn app.main:app --reload
   produksi (FastAPI Cloud **Hobby tier**), request pertama setelah idle
   (scale-to-zero default) menambah cold start platform (boot ulang + muat
   model, ~9,4 dtk import+startup terukur) — bukan per-request.
+- **RAM diet Hobby 512 MB (P3, pasca-temuan 502/OOM di live):** baseline app
+  ~415 MB + puncak compute ~493 MB mengetuk ambang — dimitigasi dgn (1)
+  `numba` TIDAK dipin di runtime (hemat ~21 MB; PBPK pakai fallback
+  pure-Python, +23 ms tak relevan vs PRD 5 dtk), (2) atom-masking SHAP
+  di-chunk 32 varian/forward (batasi puncak memori molekul besar seperti
+  Rifampin/Aprotinin), (3) `_trim_memory()` (gc + glibc `malloc_trim`,
+  Linux-only) setelah komputasi berat — cegah akumulasi RSS lintas request
+  (+128 MB setelah 5 senyawa berbeda), (4) explain LRU 10.000 → 2.048
+  (margin ekstra; footprint terukur ~10 MB utk 1.231 senyawa).
 - **Mapping Couinaud** adalah heuristik pedagogis makrovaskular
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
   histologis klinis.
