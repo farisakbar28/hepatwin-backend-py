@@ -147,6 +147,22 @@ class CompoundRepository:
                     raise e
             return []
 
+    def get_all_simulatable(self) -> List[HepatwinCompound]:
+        """Ambil SELURUH senyawa `is_simulatable = TRUE` (tanpa limit, tanpa
+        cache TTL). Dipakai skrip diagnostik batch (mis. F1
+        `scripts/diagnose_score_distribution.py`), BUKAN jalur request HTTP --
+        beda dari `get_compound_by_hepatwin_id`/`search_by_name` yang dioptimasi
+        untuk lookup satuan bertahan-cepat.
+        """
+        stmt = select(HepatwinCompound).where(HepatwinCompound.is_simulatable.is_(True))
+        compounds = list(self.db.scalars(stmt).all())
+        for c in compounds:
+            try:
+                self.db.expunge(c)
+            except Exception:
+                pass
+        return compounds
+
     # Alias untuk kompatibilitas mundur dengan test suite eksisting
     get_by_id = get_compound_by_hepatwin_id
     search_autocomplete = search_by_name

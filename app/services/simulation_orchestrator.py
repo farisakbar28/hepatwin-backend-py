@@ -1,6 +1,7 @@
 import logging
 import asyncio
-from typing import List, Dict, Any
+import time
+from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.domain import HepatwinCompound
@@ -9,21 +10,49 @@ from app.services.ai_engine import HybridAIEngine
 from app.services.pbpk_engine import PBPKEngine
 from app.services.exposure_evaluator import ExposureEvaluatorService
 from app.services.fusion_service import FusionService
-from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint
+from app.models.schemas import SimulationRequest, SimulationResponse, TimeSeriesPBPKPoint, FusionThresholds
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _timed(fn, *args):
+    """F6 (D7): jalankan `fn(*args)` di thread executor, ukur durasinya
+    sendiri (bukan dari sisi caller) -- caller hanya melihat waktu
+    `await`, bukan waktu eksekusi murni di thread pekerja.
+
+    Mengembalikan `(result, elapsed_seconds)` -- pemanggil WAJIB meng-unpack
+    kedua nilai (perbaikan pasca-merge: versi fusion lama lupa mendestruktur
+    tuple ini sehingga `dili_score`/`shap_detail` menjadi tuple dan variabel
+    timing `t_ai`/`t_shap` tidak pernah terisi)."""
+    start = time.perf_counter()
+    result = fn(*args)
+    return result, time.perf_counter() - start
+
 
 class SimulationOrchestrator:
     def __init__(self):
         self.ai_engine = HybridAIEngine(model_path=settings.AI_MODEL_PATH)
         self.pbpk_engine = PBPKEngine()
 
-    async def handle_simulation(self, request: SimulationRequest, db: Session) -> SimulationResponse:
+    async def handle_simulation(
+        self, request: SimulationRequest, db: Session,
+        timing_sink: Optional[Dict[str, float]] = None,
+    ) -> SimulationResponse:
+        """
+        `timing_sink` (F6, D7): dict opsional yang diisi durasi per-tahap
+        (ms) bila disediakan pemanggil -- dipakai skrip benchmark/test, TIDAK
+        pernah otomatis masuk response body (lihat F7 utk `timing_ms`
+        tergerbang `settings.DEBUG`). Selalu di-log server-side lewat
+        `logger.info` terlepas dari `timing_sink`.
+        """
+        t_start = time.perf_counter()
+
         # 1. Lookup Senyawa di Database (OFFLINE & DETERMINISTIK)
         repo = CompoundRepository(db)
         compound = repo.get_by_id(request.hepatwin_id)
-        
+        t_lookup_done = time.perf_counter()
+
         if not compound:
             raise HTTPException(
                 status_code=404,
@@ -42,8 +71,10 @@ class SimulationOrchestrator:
         loop = asyncio.get_running_loop()
 
         # Task A: AI Predictor (PyTorch GATNN-DNN + SHAP)
+        t_parallel_start = time.perf_counter()
         ai_task = loop.run_in_executor(
             None,
+            _timed,
             self.ai_engine.predict_dili_risk,
             smiles
         )
@@ -54,12 +85,14 @@ class SimulationOrchestrator:
         # dari shap_detail["groups"] di bawah, satu sumber komputasi.
         shap_task = loop.run_in_executor(
             None,
+            _timed,
             self.ai_engine.get_shap_detail,
             smiles
         )
 
         # Task B: PBPK Solver (SciPy ODE + Alometrik)
         cov = request.covariates
+        t_pbpk_start = time.perf_counter()
         pbpk_task = loop.run_in_executor(
             None,
             self.pbpk_engine.simulate_with_diagnostics,
@@ -71,22 +104,32 @@ class SimulationOrchestrator:
             compound.xlogp
         )
 
-        # Tunggu luaran kedua mesin secara asinkron
-        dili_score, shap_detail, pbpk_result = await asyncio.gather(
+        # Tunggu luaran kedua mesin secara asinkron. Task A dihitung memakai
+        # `_timed` (return tuple), Task B tidak -- destructure sesuai bentuknya.
+        (dili_score, t_ai), (shap_detail, t_shap), pbpk_result = await asyncio.gather(
             ai_task, shap_task, pbpk_task
         )
+        t_pbpk = time.perf_counter() - t_pbpk_start
+        t_parallel_wall = time.perf_counter() - t_parallel_start
         explainability_shap = [g["name"] for g in shap_detail["groups"]]
 
         # 3. LAPISAN FUSI RULE-BASED (Backend Fusi AI + PBPK + Lookup DB)
         # A. Evaluasi Tingkat Risiko, Warna WebGL, Kecepatan Kedip
+        t_exposure_start = time.perf_counter()
         exposure_result = ExposureEvaluatorService.evaluate_relative_exposure(
             cmax=pbpk_result.cmax_hati,
             auc=pbpk_result.auc_hati,
         )
-        
-        risk_level, visual_color, blinking_speed = FusionService.determine_visual_status(
+        t_exposure = time.perf_counter() - t_exposure_start
+
+        t_fusion_start = time.perf_counter()
+        fusion_result = FusionService.determine_visual_status(
             dili_score=dili_score,
             exposure_category=exposure_result["risk_level"]
+        )
+        t_fusion = time.perf_counter() - t_fusion_start
+        risk_level, visual_color, blinking_speed = (
+            fusion_result.risk_level, fusion_result.visual_color, fusion_result.blinking_speed
         )
 
         # B. Pemetaan Segmen Couinaud dari Monograf LiverTox
@@ -94,13 +137,30 @@ class SimulationOrchestrator:
         affected_segments: List[str] = []
 
         if compound.segment_list:
-            # Segment list disimpan sebagai titik koma terpisah (Supabase ground truth), misal "V;VI;VII;VIII"
+            # Segment list disimpan dengan pemisah titik-koma di DB nyata, mis.
+            # "V;VI;VII;VIII" (BUKAN koma -- diverifikasi lewat query langsung
+            # ke seluruh 1.231 senyawa is_simulatable=TRUE, F4). split(",") versi
+            # lama tidak pernah menemukan pemisah pada data nyata, sehingga
+            # affected_segments selalu berisi satu string gabungan yang salah
+            # utk 100% senyawa -- ditemukan & diperbaiki di sini (F4).
             affected_segments = [s.strip() for s in compound.segment_list.split(";") if s.strip()]
         else:
             # Fallback jika tidak ada monograf spesifik -> Difus seluruh segmen
             affected_segments = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
 
-        # C. Format Time Series Data
+        # C. Intensitas & mode hotspot (F4, PROJECT_FUSION.md SS4.3) -- lookup DB
+        # murni ("di mana, dan seberapa kuat buktinya"), TIDAK memengaruhi
+        # warna/kedip (itu murni hasil fusion_result di atas, "seberapa berisiko").
+        is_evidence_fallback = injury_pattern == "Tidak Terklasifikasi" or not compound.segment_list
+        hotspot_intensity = compound.hotspot_base_intensity or "dim"
+        hotspot_display_mode = compound.hotspot_display_mode or "diffuse"
+        evidence_note = (
+            "Pola cedera spesifik untuk senyawa ini belum tersedia di data kurasi; "
+            "hotspot ditampilkan difus redup sebagai default aman."
+            if is_evidence_fallback else None
+        )
+
+        # D. Format Time Series Data
         ts_points = [
             TimeSeriesPBPKPoint(
                 time=pt["time"],
@@ -118,6 +178,24 @@ class SimulationOrchestrator:
             "NAPQI/glutathione depletion, atau parameter IVIVE compound-specific penuh. Ambang exposure bersifat "
             "kalibrasi distribusional internal, bukan ambang klinis."
         )
+
+        # E. Instrumentasi latensi per-tahap (F6, D7) -- server-side saja,
+        # TIDAK pernah otomatis masuk response body (lihat F7 utk timing_ms
+        # tergerbang settings.DEBUG).
+        t_total = time.perf_counter() - t_start
+        timing_ms = {
+            "lookup_ms": round((t_lookup_done - t_start) * 1000, 2),
+            "ai_inference_ms": round(t_ai * 1000, 2),
+            "shap_ms": round(t_shap * 1000, 2),
+            "pbpk_ms": round(t_pbpk * 1000, 2),
+            "parallel_wall_ms": round(t_parallel_wall * 1000, 2),
+            "exposure_eval_ms": round(t_exposure * 1000, 2),
+            "fusion_ms": round(t_fusion * 1000, 2),
+            "total_ms": round(t_total * 1000, 2),
+        }
+        logger.info("F6 timing hepatwin_id=%s: %s", compound.hepatwin_id, timing_ms)
+        if timing_sink is not None:
+            timing_sink.update(timing_ms)
 
         return SimulationResponse(
             hepatwin_id=compound.hepatwin_id,
@@ -147,4 +225,10 @@ class SimulationOrchestrator:
             model_version=self.ai_engine.model_version,
             model_status=self.ai_engine.model_status,
             score_is_calibrated=self.ai_engine.score_is_calibrated,
+            fusion_reason=fusion_result.fusion_reason,
+            thresholds_used=FusionThresholds(t_low=settings.FUSION_AI_T_LOW, t_high=settings.FUSION_AI_T_HIGH),
+            timing_ms=timing_ms if settings.DEBUG else None,
+            hotspot_intensity=hotspot_intensity,
+            hotspot_display_mode=hotspot_display_mode,
+            evidence_note=evidence_note,
         )
