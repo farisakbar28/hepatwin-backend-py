@@ -124,7 +124,9 @@ fastapi cloud env set --secret SUPABASE_ANON_KEY "..."
 fastapi cloud env set --secret SUPABASE_SERVICE_ROLE_KEY "..."
 fastapi cloud env set BACKEND_CORS_ORIGINS '["https://hepatwin.vercel.app"]'
 fastapi cloud env set DEBUG "false"
-fastapi cloud env set PYTHONPATH "/app/ml/src"   # paket hepatwin-ml runtime (lihat §4)
+# CATATAN: PYTHONPATH TIDAK perlu (dan tidak bisa) di-set -- platform
+# menolaknya dengan HTTP 422; app/main.py meng-bootstrap hepatwin-ml dari
+# ml/src secara otomatis (lihat §4).
 ```
 
 | Variable | Wajib? | Sumber nilai | Catatan |
@@ -136,7 +138,7 @@ fastapi cloud env set PYTHONPATH "/app/ml/src"   # paket hepatwin-ml runtime (li
 | `BACKEND_CORS_ORIGINS` | Ya | URL frontend (Vercel) | JSON array: `["https://hepatwin.vercel.app"]`; `["*"]` sementara untuk uji |
 | `AI_MODEL_PATH` | Opsional | default `app/models/model_gatnn_dnn.pt` | Path relatif terhadap repo root |
 | `DEBUG` | Ya | — | **`false`** di produksi (menambah `timing_ms` bila true) |
-| `PYTHONPATH` | **Khusus cloud** | `/app/ml/src` | Menyediakan paket `hepatwin-ml` saat runtime (dipakai `ai_engine.py`); tanpa ini `import hepatwin_ml` gagal → `503`. Tidak diperlukan lokal (`pip install ./ml`) |
+| `PYTHONPATH` | **Jangan di-set** | — | Platform menolak env var ini (**HTTP 422**, CLI & dashboard). `app/main.py` menambahkan `ml/src` ke `sys.path` otomatis bila `hepatwin-ml` belum ter-install (lihat §4) |
 
 > **Jangan commit `.env`** — semua nilai di atas diatur langsung di FastAPI
 > Cloud (CLI/dashboard), bukan di repository.
@@ -161,10 +163,15 @@ fastapi cloud env set PYTHONPATH "/app/ml/src"   # paket hepatwin-ml runtime (li
   > stabil). Wheel pre-built di `ml/dist/` maupun `wheels/` (repo root) →
   > `Distribution not found at: file:///app/...` (file `.whl` tidak pernah
   > sampai ke konteks build cloud).
-  > **Solusi final:** env var **`PYTHONPATH=/app/ml/src`** (lihat §3) — file
-  > `.py` murni di `ml/src/hepatwin_ml` selalu ikut ter-upload, dan
-  > `app/services/ai_engine.py` meng-import `hepatwin_ml` dari sana. Lokal
-  > tetap `python -m pip install ./ml` (build source lokal stabil).
+  > **Solusi final:** `app/main.py` mencoba `import hepatwin_ml` dan — bila
+  > belum ter-install di environment — menambahkan `ml/src` ke `sys.path`
+  > (bootstrap otomatis; pola sama dengan baris sys.path yang sudah ada di
+  > file itu). Env var **`PYTHONPATH` TIDAK dipakai**: platform menolak env
+  > var ini dengan **HTTP 422** (CLI & dashboard). `ml/src` murni `.py` dan
+  > selalu ikut ter-upload, sehingga `app/services/ai_engine.py` meng-import
+  > `hepatwin_ml` dari sana. Lokal tetap `python -m pip install ./ml`
+  > (build source lokal stabil; bootstrap tidak aktif karena paket sudah
+  > ter-install).
 - `ml/` ikut ter-upload karena berada dalam repo dan tidak di-ignore.
 - Artefak model (`app/models/*.pt`, `*.pkl`) ter-track di git dan **tidak**
   di-ignore (`.gitignore` mengecualikan `*.pt` hanya di luar `app/models/`) →
@@ -175,7 +182,7 @@ fastapi cloud env set PYTHONPATH "/app/ml/src"   # paket hepatwin-ml runtime (li
 ```bash
 python -c "import torch; print(torch.__version__)"   # harus berakhiran +cpu
 python -c "import rdkit; print(rdkit.__version__)"
-python -c "import hepatwin_ml; print('hepatwin_ml OK')"   # butuh PYTHONPATH=/app/ml/src
+python -c "import hepatwin_ml; print('hepatwin_ml OK')"   # bootstrap otomatis dari ml/src oleh app/main.py
 ```
 
 ---
@@ -240,7 +247,7 @@ Repository** → hubungkan repo `hepatwin-backend-py`. Push ke branch default
 | Gejala | Kemungkinan penyebab | Perbaikan |
 |---|---|---|
 | `ai_engine_ready:false` / `503` | Artefak model gagal dimuat | Cek `AI_MODEL_PATH`; pastikan `app/models/*.pt` ter-track di git (bukan di-ignore) |
-| Import `hepatwin_ml` error (503) | Env `PYTHONPATH` belum di-set (dependency `hepatwin-ml` sengaja tidak ada di requirements.txt) | Set `PYTHONPATH=/app/ml/src` (CLI: `fastapi cloud env set PYTHONPATH "/app/ml/src"` atau Dashboard) dan deploy ulang; pastikan `ml/src/hepatwin_ml/` ter-track di git |
+| Import `hepatwin_ml` error (503) | `ml/src` tidak ikut ter-upload / blok bootstrap gagal | Pastikan `ml/src/hepatwin_ml/` ter-track di git (tidak di-ignore) dan `app/main.py` memuat blok bootstrap; JANGAN set env `PYTHONPATH` (platform menolaknya, HTTP 422) |
 | `500` pada lookup | `DATABASE_URL` salah / tabel kosong | Cek koneksi + `sslmode=require`; verifikasi query §0 |
 | CORS `403` dari frontend | `BACKEND_CORS_ORIGINS` belum berisi origin Vercel | Set origin eksplisit (bukan `*`) |
 | `torch.__version__` tanpa `+cpu` | Resolver pip memilih wheel PyPI | Pin eksplisit `torch==<versi>+cpu` di `requirements.txt`, deploy ulang |
@@ -259,8 +266,9 @@ Repository** → hubungkan repo `hepatwin-backend-py`. Push ke branch default
   deterministik sesuai rekomendasi docs FastAPI Cloud.
 - **Dependency `hepatwin-ml` dihapus dari `requirements.txt`** — build cloud
   tidak dapat menyediakan paket local-path (`egg_base` / `Distribution not
-  found`); runtime memakai env `PYTHONPATH=/app/ml/src`. Direktori `wheels/`
-  (wheel pre-built) ikut dihapus.
+  found`); env `PYTHONPATH` ditolak platform (HTTP 422). Runtime
+  meng-bootstrap `ml/src` lewat `app/main.py` (blok sys.path; pola yang
+  sudah ada di file itu). Direktori `wheels/` (wheel pre-built) ikut dihapus.
 
 ---
 

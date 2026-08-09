@@ -7,6 +7,20 @@ from pathlib import Path
 # Fix ModuleNotFoundError when run directly via python app/main.py
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Bootstrap `hepatwin_ml` (ml/src) bila belum ter-install di environment.
+# Runtime FastAPI Cloud TIDAK dapat meng-install paket lokal (build source
+# gagal "egg_base: src does not exist"; wheel pre-built gagal "Distribution
+# not found") dan platform menolak env var PYTHONPATH (HTTP 422). `ml/src`
+# murni .py dan selalu ikut ter-upload, jadi diimpor langsung dari sana.
+# Lokal: paket sudah ter-install (`pip install ./ml`) -> blok ini tidak
+# aktif (nol perubahan behavior).
+try:
+    import hepatwin_ml  # noqa: F401
+except ModuleNotFoundError:
+    _ml_src = Path(__file__).resolve().parent.parent / "ml" / "src"
+    if _ml_src.is_dir():
+        sys.path.insert(0, str(_ml_src))
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
