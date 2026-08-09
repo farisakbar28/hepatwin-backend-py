@@ -71,18 +71,27 @@ Seluruh langkah di dokumen ini mengasumsikan **Render Free Tier**:
 **Opsi B — Manual (Web Service):**
 
 1. **New** → **Web Service** → connect GitHub → pilih repository.
-2. **Name:** `hepatwin-backend`; **Region:** bebas (default oregon).
-3. **Branch:** `master`.
-4. **Runtime:** `Python 3` (native build, tanpa Docker).
-5. **Build Command:** `pip install -r requirements.txt`
-6. **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-7. **Instance Type:** `Free` (512 MB RAM).
-8. **Health Check Path:** `/health` (Advanced → Health Check Path).
-9. Set Environment Variables (§2) → **Create Web Service**.
+2. Isi form **Configure** sesuai tabel di bawah → **Create Web Service**.
 
-> **Catatan entrypoint:** module FastAPI adalah `app.main` (file
-> `app/main.py`), jadi start command memakai `app.main:app` — bukan
-> `main:app`.
+Isian form **Configure New Web Service** (field → nilai):
+
+| Field (label UI) | Nilai yang diisi | Catatan |
+|---|---|---|
+| **Name** | `hepatwin-backend` | Bebas; ini nama service di dashboard |
+| **Language** | `Python 3` | Native build, tanpa Docker |
+| **Branch** | `master` | Sesuai repo |
+| **Region** | `Oregon (US West)` | Bebas; konsisten dengan `render.yaml` |
+| **Root Directory** | *(kosong)* | Repo root — bukan monorepo |
+| **Build Command** | `pip install -r requirements.txt` | Abaikan prefix `$` pada field |
+| **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` | **WAJIB diganti** dari placeholder `gunicorn your_application.wsgi` — module FastAPI adalah `app.main` (`app/main.py`), bukan `main:app`; `$PORT` di-set otomatis oleh Render |
+| **Instance Type** | `Free` (512 MB RAM) | Sesuai batasan Free Tier di atas |
+
+3. Setelah service dibuat (Dashboard):
+   - **Settings → Health Check Path** → `/health` (atau isi di Advanced saat
+     create bila tersedia).
+   - **Environment** → set variabel §2 (termasuk `PYTHON_VERSION=3.11.11`
+     opsional, dan `DEBUG=false`).
+   - Klik **Deploy** (manual) atau biarkan Auto-Deploy dari `master`.
 
 ---
 
