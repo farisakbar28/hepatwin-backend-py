@@ -288,3 +288,36 @@ def test_cache_bounded_evicts_oldest_entry():
         with explain_module._explain_cache_lock:
             for i in range(maxsize + 1):
                 explain_module._explain_cache.pop(_cache_key(model, f"IK-BOUND-{i}"), None)
+
+
+def test_atom_masking_chunk_equals_full_batch(monkeypatch):
+    """P3: ekivalensi per-chunk vs batch penuh -- konstruksi varian per-chunk
+    (lazy) + forward terbatas (`_ATOM_MASK_CHUNK`) TIDAK boleh mengubah hasil
+    matematis dibanding batch raksasa satu-pass. Di-pin sebagai test regresi
+    agar refactor berikutnya tidak merusak invariant ini tanpa terdeteksi.
+    """
+    import hepatwin_ml.explain as explain_module
+
+    torch.manual_seed(0)
+    model = GatnnDnn()
+    model.eval()
+
+    smiles = "CC(=O)Nc1ccc(O)cc1"  # parasetamol, 11 atom -> 12 varian
+    mol = Chem.MolFromSmiles(smiles)
+    graph_data = smiles_to_graph(smiles)
+    fp = dnn_feature_vector(mol)
+
+    orig = explain_module._ATOM_MASK_CHUNK
+    try:
+        explain_module._ATOM_MASK_CHUNK = 2  # paksa multi-chunk (12 varian -> 6 chunk)
+        chunked = explain_module.atom_masking_attribution(
+            model, smiles, graph_data=graph_data, fingerprint=fp
+        )
+        explain_module._ATOM_MASK_CHUNK = 10**6  # batch penuh (perilaku lama)
+        full = explain_module.atom_masking_attribution(
+            model, smiles, graph_data=graph_data, fingerprint=fp
+        )
+    finally:
+        explain_module._ATOM_MASK_CHUNK = orig
+
+    assert chunked == full  # dict {idx, value} identik (value dibulatkan 6 desimal)

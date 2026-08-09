@@ -312,27 +312,31 @@ def atom_masking_attribution(
     fp_tensor = torch.tensor(fingerprint, dtype=torch.float)
     n_atoms = graph_data.x.shape[0]
 
-    # Varian 0 = molekul utuh (baseline); varian i+1 = atom i dinolkan.
-    variants = [Data(x=graph_data.x, edge_index=graph_data.edge_index, edge_attr=graph_data.edge_attr)]
-    for i in range(n_atoms):
-        x_masked = graph_data.x.clone()
-        x_masked[i, :] = 0.0
-        variants.append(Data(x=x_masked, edge_index=graph_data.edge_index, edge_attr=graph_data.edge_attr))
-
-    # P3: forward per CHUNK (bukan satu batch raksasa) -- membatasi puncak
-    # memori utk molekul besar (Rifampin 60 varian, Aprotinin 455 varian):
-    # batch 455 graf + fingerprint duplikat menaikkan RSS puluhan MB dan
-    # mengetuk ambang OOM Hobby 512 MB (502 + restart). Hasil matematis
-    # IDENTIK -- tiap varian tetap dihitung sendiri, hanya ukuran batch yang
-    # dibatasi.
+    # P3: varian atom-masking dibangun PER-CHUNK (lazy) -- tidak pernah
+    # menyimpan seluruh N+1 salinan graf sekaligus, dan forward juga per
+    # chunk (bukan satu batch raksasa). Membatasi puncak memori utk molekul
+    # besar (Rifampin 60 varian, ~124 atom 565 MB peak): satu batch 455 graf
+    # + fingerprint duplikat menaikkan RSS puluhan MB dan mengetuk ambang
+    # OOM Hobby 512 MB (502 + restart). Hasil matematis IDENTIK -- tiap
+    # varian tetap dihitung sendiri, hanya ukuran batch & konstruksi graf
+    # yang dibatasi.
     n_variants = n_atoms + 1
     probs = np.empty(n_variants, dtype=np.float64)
+    base = dict(edge_index=graph_data.edge_index, edge_attr=graph_data.edge_attr)
     for start in range(0, n_variants, _ATOM_MASK_CHUNK):
-        chunk_variants = variants[start:start + _ATOM_MASK_CHUNK]
-        batch = Batch.from_data_list(chunk_variants)
-        batch.fingerprint = fp_tensor.unsqueeze(0).repeat(len(chunk_variants), 1)
+        end = min(start + _ATOM_MASK_CHUNK, n_variants)
+        variants = []
+        for j in range(start, end):
+            if j == 0:  # varian baseline: molekul utuh
+                variants.append(Data(x=graph_data.x, **base))
+            else:
+                x_masked = graph_data.x.clone()
+                x_masked[j - 1, :] = 0.0
+                variants.append(Data(x=x_masked, **base))
+        batch = Batch.from_data_list(variants)
+        batch.fingerprint = fp_tensor.unsqueeze(0).repeat(len(variants), 1)
         with torch.no_grad():
-            probs[start:start + len(chunk_variants)] = torch.sigmoid(model(batch)).numpy().ravel()
+            probs[start:end] = torch.sigmoid(model(batch)).numpy().ravel()
 
     baseline_prob = float(probs[0])
     return [{"idx": i, "value": round(baseline_prob - float(probs[i + 1]), 6)} for i in range(n_atoms)]

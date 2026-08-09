@@ -134,9 +134,10 @@ uvicorn app.main:app --reload
 - **RAM diet Hobby 512 MB (P3, pasca-temuan 502/OOM di live):** baseline app
   ~415 MB + puncak compute ~493 MB mengetuk ambang — dimitigasi dgn (1)
   `numba` TIDAK dipin di runtime (hemat ~21 MB; PBPK pakai fallback
-  pure-Python, +23 ms tak relevan vs PRD 5 dtk), (2) atom-masking SHAP
-  di-chunk 32 varian/forward (batasi puncak memori molekul besar seperti
-  Rifampin/Aprotinin),  (3) `_trim_memory()` (glibc `malloc_trim`, Linux-only) setelah komputasi
+  pure-Python, +23 ms tak relevan vs PRD 5 dtk),  (2) atom-masking SHAP
+  di-chunk 32 varian/forward + varian dibangun per-chunk (lazy) (batasi
+  puncak memori molekul besar; batas stabil terukur ~120 atom, 1,9%
+  katalog >=120 atom berisiko gagal di Hobby), (3) `_trim_memory()` (glibc `malloc_trim`, Linux-only) setelah komputasi
   berat — cegah akumulasi RSS lintas request (+128 MB setelah 5 senyawa
   berbeda; tanpa `gc.collect` yang terukur ~260 ms/request), (4) explain LRU
   10.000 → 2.048
