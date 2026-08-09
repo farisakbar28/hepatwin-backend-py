@@ -1,0 +1,45 @@
+# ============================================================
+# HepaTwin Backend — Render Blueprint (Infrastructure-as-Code)
+#
+# Deploy langsung: buka https://render.com → New → Blueprint,
+# pilih repository ini. Render membaca render.yaml dan membuat
+# Web Service + env vars di bawah.
+#
+# Bisa juga dibuat manual: New → Web Service → connect GitHub →
+# isi Build Command / Start Command / Health Check Path sesuai
+# nilai di bawah (lihat DEPLOYMENT_RENDER.md).
+# ============================================================
+
+services:
+  - type: web
+    name: hepatwin-backend
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Versi Python yang didukung wheel torch/rdkit CPU (>=3.10).
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      # Path artefak model (relatif terhadap root repo — WORKDIR Render).
+      - key: AI_MODEL_PATH
+        value: app/models/model_gatnn_dnn.pt
+      # False di produksi; True menambah timing_ms pada /api/v1/simulate.
+      - key: DEBUG
+        value: "false"
+      # Origin frontend. ["*"] sementara; ganti origin eksplisit saat
+      # URL produksi Vercel final (allow_credentials nonaktif bila "*").
+      - key: BACKEND_CORS_ORIGINS
+        value: '["*"]'
+      # --- Nilai rahasia: di-set manual di Dashboard Render ---
+      # (sync: false → Render tidak menimpa nilai yang diisi manual).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false

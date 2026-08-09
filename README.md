@@ -123,19 +123,21 @@ uvicorn app.main:app --reload
   (`segment_mapping_type = PEDAGOGICAL_HEURISTIC`), bukan lokalisasi
   histologis klinis.
 
-## Deployment (Koyeb)
+## Deployment (Render)
 
-- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_KOYEB.md`**.
-- **Entrypoint:** `Procfile` → `web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`
-  (Koyeb default HTTP port **8000**).
-- **Build:** `Dockerfile` disertakan (PyTorch **CPU-only** via
-  `--extra-index-url https://download.pytorch.org/whl/cpu` — optimal untuk
-  Micro Instance 512 MB); alternatif buildpack (Nixpacks) juga didukung.
-- **Set env di dashboard Koyeb:** `DATABASE_URL`, `SUPABASE_URL`,
+- **Checklist langkah-demi-langkah:** lihat **`DEPLOYMENT_RENDER.md`**.
+- **Blueprint IaC:** `render.yaml` (New → Blueprint) — runtime Python,
+  Build Command `pip install -r requirements.txt`, Start Command
+  `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health check `/health`.
+- **Entrypoint:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+  (Render meng-set `PORT` otomatis; default **10000**).
+- **Build:** native Python; PyTorch **CPU-only** via
+  `--extra-index-url https://download.pytorch.org/whl/cpu` + `torch>=2.3.1+cpu`
+  di `requirements.txt` — optimal untuk Free Tier **512 MB RAM**.
+- **Set env di Dashboard Render:** `DATABASE_URL`, `SUPABASE_URL`,
   `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS`
   (origin frontend Vercel), `DEBUG=False`.
-- **Health check:** `GET /health` — set sebagai HTTP health check di Koyeb
-  (path `/health`).
+- **Health check:** `GET /health` — set sebagai health check path di Render.
 - Tidak bergantung pada path lokal/Windows; seluruh path relatif ke repo.
 
 ## Verifikasi
