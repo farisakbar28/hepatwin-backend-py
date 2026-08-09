@@ -336,7 +336,7 @@ Keunggulan arsitektur HepaTwin terletak pada **pemisahan komputasi paralel-asink
 
 - **Backend Application Server:**
   - *Framework:* **Python 3.11+ / FastAPI** (kinerja tinggi, asinkron, validasi tipe ketat via Pydantic).
-  - *AI / ML Engineering:* **PyTorch** untuk eksekusi model Graph Attention Network - Dense Neural Network (**GATNN-DNN**); **RDKit** untuk pembacaan SMILES, validasi konektivitas atom, dan ekstraksi sidik jari ECFP4; **Captum / SHAP** untuk interpretasi fitur.
+  - *AI / ML Engineering:* **PyTorch** untuk eksekusi model Graph Attention Network - Dense Neural Network (**GATNN-DNN**); **RDKit** untuk pembacaan SMILES, validasi konektivitas atom, dan ekstraksi sidik jari ECFP4; **atribusi Shapley eksak (tingkat gugus SMARTS) + masking per-atom (tingkat atom, diberi label jujur `masking_attribution`)** untuk interpretasi fitur -- diimplementasikan native di `hepatwin_ml.explain` tanpa library `shap`/`captum`, sesuai §8.1.
   - *Scientific Computing:* **SciPy (scipy.integrate.solve_ivp)** menggunakan metode Runge-Kutta orde 4–5 (`RK45`) untuk penyelesaian numerik sistem persamaan diferensial PBPK 4-kompartemen.
 
 - **Cloud Database & Infrastructure:**
