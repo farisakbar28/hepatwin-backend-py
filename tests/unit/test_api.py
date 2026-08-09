@@ -31,6 +31,24 @@ def _override_get_db():
 def test_health_check():
     response = client.get("/health")
     assert response.status_code in [200, 404]
+    if response.status_code == 200:
+        # Observabilitas produksi: cache_stats (4 cache) + RSS wajib ada
+        body = response.json()
+        assert body["status"] == "ok"
+        assert set(body["cache_stats"].keys()) == {"simulate", "explain", "smarts", "pbpk_base"}
+        for stats in body["cache_stats"].values():
+            assert {"hits", "misses", "hit_rate", "size", "maxsize"} <= stats.keys()
+            assert 0.0 <= stats["hit_rate"] <= 1.0
+        assert "memory_rss_mb" in body
+
+def test_memory_rss_mb_tidak_pernah_raise():
+    """Observabilitas: helper RSS tidak boleh pernah raise di platform mana
+    pun -- mengembalikan float (MB) bila tersedia, None bila tidak."""
+    from app.api.endpoints.health import _memory_rss_mb
+
+    value = _memory_rss_mb()
+    assert value is None or (isinstance(value, float) and value > 0.0)
+
 
 def test_compounds_autocomplete_validation():
     # Tanpa query 'q' harus 422 Unprocessable Entity

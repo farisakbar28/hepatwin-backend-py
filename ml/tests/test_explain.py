@@ -321,3 +321,33 @@ def test_atom_masking_chunk_equals_full_batch(monkeypatch):
         explain_module._ATOM_MASK_CHUNK = orig
 
     assert chunked == full  # dict {idx, value} identik (value dibulatkan 6 desimal)
+
+
+def test_cache_stats_memantau_hit_miss_kedua_cache():
+    """Observabilitas produksi: cache_stats() (dikonsumsi /health) harus
+    memantau hit/miss kedua cache in-memory (explain & smarts) -- delta dari
+    snapshot awal agar kebal urutan test (counter global antar-test)."""
+    import hepatwin_ml.explain as explain_module
+
+    torch.manual_seed(0)
+    model = GatnnDnn()
+    model.eval()
+    smiles = "CC(=O)Nc1ccc(O)cc1"
+
+    before = explain_module.cache_stats()
+    assert set(before.keys()) == {"explain", "smarts"}
+    for name in ("explain", "smarts"):
+        assert set(before[name].keys()) == {"hits", "misses", "stores", "hit_rate", "size", "maxsize"}
+        assert before[name]["maxsize"] == explain_module._EXPLAIN_CACHE_MAXSIZE
+        assert 0.0 <= before[name]["hit_rate"] <= 1.0
+
+    explain_module.explain_smarts_contribution(model, smiles, "IK-STATS-SMARTS")  # miss smarts
+    explain_module.explain_smarts_contribution(model, smiles, "IK-STATS-SMARTS")  # hit smarts
+    explain_module.explain(model, smiles, "IK-STATS-EXPLAIN")  # miss explain
+    explain_module.explain(model, smiles, "IK-STATS-EXPLAIN")  # hit explain
+
+    after = explain_module.cache_stats()
+    assert after["smarts"]["misses"] >= before["smarts"]["misses"] + 1
+    assert after["smarts"]["hits"] >= before["smarts"]["hits"] + 1
+    assert after["explain"]["misses"] >= before["explain"]["misses"] + 1
+    assert after["explain"]["hits"] >= before["explain"]["hits"] + 1

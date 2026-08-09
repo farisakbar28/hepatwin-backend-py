@@ -73,7 +73,11 @@ pakar/juri: `BMI`, `metabolic_risk_flag`, `V_P_L`, `V_L_L`, `V_K_L`, `V_R_L`,
 - `GET /api/v1/compounds/autocomplete?q=...&limit=...` — daftar tertutup
   1.231 senyawa simulatable (ETag + Cache-Control).
 - `GET /api/v1/compounds/{hepatwin_id}` — detail senyawa.
-- `GET /health` — status proses + kesiapan engine AI/PBPK.
+- `GET /health` — status proses + kesiapan engine AI/PBPK + **observabilitas
+  produksi**: `cache_stats` (hit/miss/hit-rate/ukuran utk cache `simulate`,
+  `explain`, `smarts`, `pbpk_base` -- efektivitas cache terpantau langsung
+  dari endpoint live) dan `memory_rss_mb` (RSS proses, memantau margin aman
+  512 MB Hobby tier tanpa akses log server).
 
 ## Environment Variables
 

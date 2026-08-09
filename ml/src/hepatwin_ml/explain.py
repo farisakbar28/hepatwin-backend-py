@@ -83,6 +83,19 @@ _explain_cache: LRUCache = LRUCache(maxsize=_EXPLAIN_CACHE_MAXSIZE)
 _explain_cache_lock = threading.Lock()
 _smarts_cache: LRUCache = LRUCache(maxsize=_EXPLAIN_CACHE_MAXSIZE)
 _smarts_cache_lock = threading.Lock()
+# Observabilitas produksi (via /health): hit/miss/store per cache -- mutasi
+# terjadi di dalam lock cache masing-masing sehingga snapshot tidak pernah
+# melihat setengah-update.
+# KUNCI = id(cache): cachetools LRUCache tidak hashable (def __eq__ ->
+# __hash__=None), jadi objek cache tidak bisa jadi dict key. Aman: HANYA dua
+# cache singleton modul (_explain_cache/_smarts_cache) yang lewat helper ini;
+# keduanya hidup seumur proses sehingga id() tidak pernah di-reuse.
+_cache_counters: dict[int, dict] = {}
+
+
+def _counter(cache: LRUCache) -> dict:
+    """Counter {hits, misses, stores} utk sebuah cache (dibuat lazy)."""
+    return _cache_counters.setdefault(id(cache), {"hits": 0, "misses": 0, "stores": 0})
 
 
 def _cache_key(model, inchikey: str) -> tuple:
@@ -92,18 +105,48 @@ def _cache_key(model, inchikey: str) -> tuple:
 
 
 def _cache_get(cache: LRUCache, lock: threading.Lock, key) -> dict | None:
-    """Baca cache thread-safe; cachetools memperbarui recency saat get (LRU)."""
+    """Baca cache thread-safe; cachetools memperbarui recency saat get (LRU).
+    Menghitung hit/miss utk observabilitas /health."""
     with lock:
+        counter = _counter(cache)
         try:
-            return cache[key]
+            value = cache[key]
+            counter["hits"] += 1
+            return value
         except KeyError:
+            counter["misses"] += 1
             return None
 
 
 def _cache_set(cache: LRUCache, lock: threading.Lock, key, value: dict) -> None:
     """Tulis cache thread-safe; LRU meng-evict entri terlama bila penuh."""
     with lock:
+        _counter(cache)["stores"] += 1
         cache[key] = value
+
+
+def cache_stats() -> dict:
+    """Snapshot hit/miss/hit-rate + ukuran kedua cache in-memory (explain &
+    smarts) -- dipakai GET /health utk observabilitas produksi. Best-effort:
+    dibaca tanpa lock (counter int + len cache sudah cukup akurat utk
+    pemantauan). Counter KUMULATIF seumur proses (tidak pernah di-reset),
+    sehingga hit-rate = agregat lifetime, bukan per-window."""
+    def _snapshot(cache: LRUCache) -> dict:
+        c = _cache_counters.get(id(cache), {"hits": 0, "misses": 0, "stores": 0})
+        total = c["hits"] + c["misses"]
+        return {
+            "hits": c["hits"],
+            "misses": c["misses"],
+            "stores": c["stores"],
+            "hit_rate": round(c["hits"] / total, 4) if total else 0.0,
+            "size": len(cache),
+            "maxsize": cache.maxsize,
+        }
+
+    return {
+        "explain": _snapshot(_explain_cache),
+        "smarts": _snapshot(_smarts_cache),
+    }
 
 
 # ---------------------------------------------------------------------------

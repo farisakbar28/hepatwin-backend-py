@@ -135,6 +135,22 @@ class PBPKEngine:
         self._verify_mass_balance(sol_y, params, 1.0)
         return solution.t, sol_y, params
 
+    def pbpk_cache_stats(self) -> dict:
+        """Snapshot lru_cache `_simulate_base` -- dipakai GET /health utk
+        observabilitas produksi. Skema disamakan dgn cache lain di /health
+        (simulate/explain/smarts): `stores` = misses (setiap miss lru_cache
+        = satu penyimpanan baru). Counter KUMULATIF seumur proses."""
+        info = self._simulate_base.cache_info()
+        total = info.hits + info.misses
+        return {
+            "hits": info.hits,
+            "misses": info.misses,
+            "stores": info.misses,
+            "hit_rate": round(info.hits / total, 4) if total else 0.0,
+            "size": info.currsize,
+            "maxsize": info.maxsize,
+        }
+
     def simulate_with_diagnostics(
         self,
         dosis_mg: float,

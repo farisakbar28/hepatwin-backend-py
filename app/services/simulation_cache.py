@@ -31,6 +31,9 @@ from app.models.schemas import SimulationRequest, SimulationResponse
 _SIMULATION_CACHE_MAXSIZE = 512
 _cache: LRUCache = LRUCache(maxsize=_SIMULATION_CACHE_MAXSIZE)
 _lock = threading.Lock()
+# Observabilitas produksi (via /health): hit/miss/store counters -- semua
+# mutasi di bawah `_lock` yang sama, jadi snapshot konsisten dengan cache.
+_stats = {"hits": 0, "misses": 0, "stores": 0}
 
 
 def build_simulation_cache_key(request: SimulationRequest, compound: HepatwinCompound) -> tuple:
@@ -60,11 +63,14 @@ def build_simulation_cache_key(request: SimulationRequest, compound: HepatwinCom
 
 def get_simulation_cached(key: tuple) -> SimulationResponse | None:
     """Baca cache thread-safe; LRUCache sendiri tidak thread-safe, semua akses
-    lewat lock ini."""
+    lewat lock ini. Menghitung hit/miss utk observabilitas /health."""
     with _lock:
         try:
-            return _cache[key]
+            value = _cache[key]
+            _stats["hits"] += 1
+            return value
         except KeyError:
+            _stats["misses"] += 1
             return None
 
 
@@ -72,6 +78,7 @@ def put_simulation_cached(key: tuple, response: SimulationResponse) -> None:
     """Simpan respons; LRU meng-evict entri terlama bila penuh."""
     with _lock:
         _cache[key] = response
+        _stats["stores"] += 1
 
 
 def clear_simulation_cache() -> None:
@@ -84,3 +91,25 @@ def clear_simulation_cache() -> None:
 def simulation_cache_size() -> int:
     with _lock:
         return len(_cache)
+
+
+def simulation_cache_stats() -> dict:
+    """Snapshot counters hit/miss + ukuran cache -- dipakai GET /health
+    (observabilitas produksi: efektivitas cache P3 terpantau langsung dari
+    endpoint live tanpa akses log). Hit-rate dihitung atas get (hit+miss),
+    `stores` dilaporkan terpisah. Counter KUMULATIF seumur proses: tidak
+    di-reset oleh `clear_simulation_cache()`/`CompoundRepository.clear_caches()`
+    (yang hanya membuang entri, bukan riwayat) -- hit-rate = agregat lifetime."""
+    with _lock:
+        hits, misses, stores = _stats["hits"], _stats["misses"], _stats["stores"]
+        size = len(_cache)
+        maxsize = _cache.maxsize
+    total = hits + misses
+    return {
+        "hits": hits,
+        "misses": misses,
+        "stores": stores,
+        "hit_rate": round(hits / total, 4) if total else 0.0,
+        "size": size,
+        "maxsize": maxsize,
+    }

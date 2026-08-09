@@ -66,6 +66,29 @@ def test_get_put_clear():
     sc.put_simulation_cached(key, {"dummy": "response"})
     assert sc.get_simulation_cached(key) == {"dummy": "response"}
     sc.clear_simulation_cache()
+
+
+def test_stats_mencatat_hit_miss_dan_hit_rate():
+    """Observabilitas /health: counters hit/miss/store + hit-rate + ukuran
+    harus mencerminkan akses nyata ke cache (delta dari snapshot awal agar
+    kebal terhadap urutan test)."""
+    sc.clear_simulation_cache()
+    key = sc.build_simulation_cache_key(_req(), _compound())
+    before = sc.simulation_cache_stats()
+
+    assert sc.get_simulation_cached(key) is None  # miss
+    sc.put_simulation_cached(key, {"dummy": "response"})  # store
+    assert sc.get_simulation_cached(key) == {"dummy": "response"}  # hit
+
+    after = sc.simulation_cache_stats()
+    assert after["misses"] - before["misses"] == 1
+    assert after["hits"] - before["hits"] == 1
+    assert after["stores"] - before["stores"] == 1
+    total = after["hits"] + after["misses"]
+    assert after["hit_rate"] == round(after["hits"] / total, 4)
+    assert after["size"] >= 1
+    assert after["maxsize"] == sc._SIMULATION_CACHE_MAXSIZE
+    sc.clear_simulation_cache()
     assert sc.get_simulation_cached(key) is None
 
 
