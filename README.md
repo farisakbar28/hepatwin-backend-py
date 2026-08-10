@@ -7,7 +7,7 @@ rekomendasi dosis, atau keputusan terapi.
 
 ## Stack
 
-- **API:** FastAPI + Pydantic v2 (Python 3.10+).
+- **API:** FastAPI + Pydantic v2 (Python 3.11+, sesuai `.python-version` = 3.11.11 dan runtime FastAPI Cloud).
 - **AI:** PyTorch GATNN-DNN (inferensi statis, tanpa retraining runtime) +
   RDKit (graf molekul & ECFP4) — featurization/model/explain diimpor dari
   paket `hepatwin-ml` (`ml/src/hepatwin_ml`, murni .py). Lokal:
@@ -84,9 +84,9 @@ pakar/juri: `BMI`, `metabolic_risk_flag`, `V_P_L`, `V_L_L`, `V_K_L`, `V_R_L`,
 | Variable | Keterangan |
 |---|---|
 | `DATABASE_URL` | **Wajib.** Koneksi Postgres Supabase (SQLAlchemy, `sslmode=require`). |
-| `SUPABASE_URL` | URL project Supabase (untuk klien SDK, opsional untuk runtime). |
-| `SUPABASE_ANON_KEY` | Anon key Supabase. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service-role key Supabase (jangan diekspos ke publik). |
+| `SUPABASE_URL` | URL project Supabase — dipakai pipeline riset `ml/` (klien SDK di `ml/src/hepatwin_ml/data/load_supabase.py`) & test RLS; opsional untuk runtime API. |
+| `SUPABASE_ANON_KEY` | Anon key Supabase (dipakai pipeline riset `ml/`). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-role key Supabase — hanya dipakai test RLS eksternal (`tests/security/test_rls_policies.py`); tidak dikonsumsi runtime API (klien SDK service-role dihapus). Jangan diekspos ke publik. |
 | `BACKEND_CORS_ORIGINS` | Origin yang diizinkan, JSON array atau koma (default `["http://localhost:3000"]`). |
 | `AI_MODEL_PATH` | Path artefak model (default `app/models/model_gatnn_dnn.pt`). |
 | `DEBUG` | `False` di produksi; `True` menambahkan `timing_ms` per-tahap pada response simulate. |
@@ -166,11 +166,12 @@ uvicorn app.main:app --reload
   menang atas versi plain PyPI (verifikasi: `torch.__version__` berakhiran
   `+cpu`).
 - **Env vars:** di-set di Dashboard FastAPI Cloud (App → Environment
-  Variables) — `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-  `SUPABASE_SERVICE_ROLE_KEY`, `BACKEND_CORS_ORIGINS` (origin frontend),
-  `DEBUG=False`. **`PYTHONPATH` TIDAK perlu di-set** — `app/main.py`
-  meng-bootstrap `hepatwin-ml` dari `ml/src` (platform menolak env var ini
-  dengan HTTP 422).
+  Variables) — runtime hanya mengonsumsi `DATABASE_URL`, `BACKEND_CORS_ORIGINS`
+  (origin frontend), dan `DEBUG=False`. `SUPABASE_URL` / `SUPABASE_ANON_KEY` /
+  `SUPABASE_SERVICE_ROLE_KEY` **tidak dikonsumsi runtime** (hanya dipakai test
+  RLS lokal & pipeline riset `ml/`) — aman ditinggalkan di cloud.
+  **`PYTHONPATH` TIDAK perlu di-set** — `app/main.py` meng-bootstrap
+  `hepatwin-ml` dari `ml/src` (platform menolak env var ini dengan HTTP 422).
 - **Scale-to-zero (default):** app tidur saat idle; request pertama setelah
   idle menambah cold start (boot ulang + muat model) — normal untuk Hobby tier.
 - Tidak bergantung pada path lokal/Windows; seluruh path relatif ke repo.
